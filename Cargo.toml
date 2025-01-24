@@ -1,0 +1,12 @@
+[package]
+name = "libtorrent-rasterbar-sys"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bitflags = "2.8.0"
+cxx = { version = "1.0", features = ["c++14"] }
+
+[build-dependencies]
+cxx-build = { version = "1.0", features = ["parallel"] }
+glob = "0.3"
