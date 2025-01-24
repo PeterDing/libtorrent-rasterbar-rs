@@ -1,0 +1,5 @@
+-Ilibtorrent/include
+-Ilibtorrent/include/libtorrent
+-Itarget/cxxbridge
+-I..
+-DTORRENT_USE_UNC_PATHS
