@@ -248,13 +248,16 @@ TorrentInfo _get_torrent_info(const lt::torrent_info& lt_ti) {
   // fill blocks per piece
   ti.blocks_per_piece = lt_ti.blocks_per_piece();
   // fill info-hash
+  // TODO: use lt_ti.info_hashs()
   ti.info_hash = rust::String::lossy(to_hex(lt_ti.info_hash()));
+  // file num_files
+  ti.num_files = static_cast<std::uint32_t>(lt_ti.num_files());
   // fill name
   ti.name = rust::String::lossy(lt_ti.name());
   // fill creation date
   ti.creation_date = static_cast<int64_t>(lt_ti.creation_date());
-  // fill created by
-  ti.created_by = rust::String::lossy(lt_ti.creator());
+  // fill creator
+  ti.creator = rust::String::lossy(lt_ti.creator());
   // fill ssl cert
   ti.ssl_cert = rust::String::lossy(lt_ti.ssl_cert().to_string());
   // fill is private
