@@ -5,6 +5,7 @@
 #include "../libtorrent/include/libtorrent/torrent_status.hpp"
 
 #include <cstdint>
+#include <vector>
 
 namespace libtorrent_wrapper {
 
@@ -90,6 +91,7 @@ PeerState::PeerState() {}
 PeerState::~PeerState() {}
 
 void PeerState::update_peers(lt::peer_info_alert* a) {
+  printf("!!!!update_peers\n");
   auto h = a->handle;
   auto peers = a->peer_info;
   auto j = m_all_peers.find(h);
@@ -98,6 +100,14 @@ void PeerState::update_peers(lt::peer_info_alert* a) {
   } else {
     j->second = std::move(peers);
   }
+}
+
+std::vector<lt::peer_info> PeerState::get_peers(lt::torrent_handle h) {
+  auto i = m_all_peers.find(h);
+  if (i == m_all_peers.end())
+    return std::vector<lt::peer_info>();
+  printf("!!!!get_peers\n");
+  return i->second;
 }
 
 void PeerState::remove(lt::torrent_handle h) {
@@ -120,6 +130,13 @@ void FileProgressState::update_file_progress(lt::file_progress_alert* a) {
   } else {
     j->second = std::move(file_progress);
   }
+}
+
+std::vector<std::int64_t> FileProgressState::get_file_progress(lt::torrent_handle h) {
+  auto i = m_all_file_progress.find(h);
+  if (i == m_all_file_progress.end())
+    return std::vector<std::int64_t>();
+  return i->second;
 }
 
 void FileProgressState::remove(lt::torrent_handle h) {
@@ -149,6 +166,15 @@ void PieceInfoState::update_piece_info(lt::piece_info_alert* a) {
   }
 }
 
+// std::pair<std::vector<lt::partial_piece_info>, std::vector<lt::block_info>>
+// PieceInfoState::get_piece_info(lt::torrent_handle h) {
+//   auto i = m_all_piece_info.find(h);
+//   if (i == m_all_piece_info.end())
+//     return std::make_pair(std::vector<lt::partial_piece_info>(),
+//                           std::vector<lt::block_info>());
+//   return i->second;
+// }
+
 void PieceInfoState::remove(lt::torrent_handle h) {
   auto i = m_all_piece_info.find(h);
   if (i == m_all_piece_info.end())
@@ -171,6 +197,13 @@ void PieceAvailabilityState::update_piece_availability(lt::piece_availability_al
   }
 }
 
+std::vector<int> PieceAvailabilityState::get_piece_availability(lt::torrent_handle h) {
+  auto i = m_all_piece_availability.find(h);
+  if (i == m_all_piece_availability.end())
+    return std::vector<int>();
+  return i->second;
+}
+
 void PieceAvailabilityState::remove(lt::torrent_handle h) {
   auto i = m_all_piece_availability.find(h);
   if (i == m_all_piece_availability.end())
@@ -191,6 +224,13 @@ void TrackerState::update_trackers(lt::tracker_list_alert* a) {
   } else {
     j->second = std::move(trackers);
   }
+}
+
+std::vector<lt::announce_entry> TrackerState::get_trackers(lt::torrent_handle h) {
+  auto i = m_all_trackers.find(h);
+  if (i == m_all_trackers.end())
+    return std::vector<lt::announce_entry>();
+  return i->second;
 }
 
 void TrackerState::remove(lt::torrent_handle h) {

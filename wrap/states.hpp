@@ -84,6 +84,7 @@ public:
   ~PeerState();
 
   void update_peers(lt::peer_info_alert* a);
+  std::vector<lt::peer_info> get_peers(lt::torrent_handle h);
   void remove(lt::torrent_handle h);
 
 private:
@@ -97,6 +98,7 @@ public:
   ~FileProgressState();
 
   void update_file_progress(lt::file_progress_alert* a);
+  std::vector<std::int64_t> get_file_progress(lt::torrent_handle h);
   void remove(lt::torrent_handle h);
 
 private:
@@ -111,6 +113,10 @@ public:
   ~PieceInfoState();
 
   void update_piece_info(lt::piece_info_alert* a);
+
+  // std::pair<std::vector<lt::partial_piece_info>, std::vector<lt::block_info>>
+  // get_piece_info(lt::torrent_handle h);
+
   void remove(lt::torrent_handle h);
 
 private:
@@ -128,6 +134,7 @@ public:
   ~PieceAvailabilityState();
 
   void update_piece_availability(lt::piece_availability_alert* a);
+  std::vector<int> get_piece_availability(lt::torrent_handle h);
   void remove(lt::torrent_handle h);
 
 private:
@@ -141,6 +148,7 @@ public:
   ~TrackerState();
 
   void update_trackers(lt::tracker_list_alert* a);
+  std::vector<lt::announce_entry> get_trackers(lt::torrent_handle h);
   void remove(lt::torrent_handle h);
 
 private:
