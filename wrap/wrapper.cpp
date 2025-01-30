@@ -10,6 +10,7 @@
 #include "../libtorrent/include/libtorrent/read_resume_data.hpp"
 #include "../libtorrent/include/libtorrent/session_types.hpp"
 #include "../libtorrent/include/libtorrent/string_view.hpp"
+#include "../libtorrent/include/libtorrent/time.hpp"
 #include "../libtorrent/include/libtorrent/torrent_flags.hpp"
 #include "../libtorrent/include/libtorrent/write_resume_data.hpp"
 
@@ -21,6 +22,7 @@
 #include <boost/algorithm/string/split.hpp>
 #include <system_error>
 #include <thread>
+#include <vector>
 
 namespace libtorrent_wrapper {
 
@@ -29,12 +31,22 @@ Session::Session(lt::session_params params, std::string session_state_path,
     : m_session_state_path(session_state_path), m_torrent_dir(torrent_dir),
       m_resume_dir(resume_dir) {
   lt_session = std::make_shared<lt::session>(lt::session(std::move(params)));
+  m_running = true;
+
+  m_thread = std::make_shared<std::thread>([=] { poll_alerts(); });
 }
 
 Session::~Session() {
   lt_session->abort(); // asynchronous deconstruction
+  m_running = false;
+
+  if (m_thread) {
+    m_thread->join();
+  }
+
   lt_session.reset();
 }
+
 void assign_session_setting(lt::settings_pack& settings, std::string const& key,
                             std::string const& value) {
 
@@ -235,9 +247,9 @@ TorrentInfo _get_torrent_info(const lt::torrent_info& lt_ti) {
     ti.web_seeds.push_back(rust::String::lossy(ws.url));
   }
   // fill nodes
+  // TODO: diff ipv4 and ipv6
   for (auto& n : lt_ti.nodes()) {
-    ti.nodes.push_back(
-        DHTNode{rust::String::lossy(n.first), static_cast<std::uint32_t>(n.second)});
+    ti.nodes.push_back(rust::String::lossy(n.first + ":" + std::to_string(n.second)));
   }
   // fill total size
   ti.total_size = lt_ti.total_size();
@@ -268,7 +280,8 @@ TorrentInfo _get_torrent_info(const lt::torrent_info& lt_ti) {
   return ti;
 }
 
-std::string Session::get_resume_file_path(std::string info_hash_str) const {
+std::string Session::get_resume_file_path(lt::sha1_hash info_hash) const {
+  std::string info_hash_str = to_hex(info_hash);
   std::string resume_file(m_resume_dir);
   lt::append_path(resume_file, info_hash_str + ".resume");
   return resume_file;
@@ -377,8 +390,7 @@ void Session::add_torrent(rust::Str torrent_path,
 
   lt::add_torrent_params atp = lt::load_torrent_file(tp);
   std::vector<char> resume_data;
-  if (load_file(get_resume_file_path(atp.info_hashes.get_best().to_string()),
-                resume_data)) {
+  if (load_file(get_resume_file_path(atp.info_hashes.get_best()), resume_data)) {
     lt::error_code ec;
     lt::add_torrent_params rd = lt::read_resume_data(resume_data, ec);
     if (ec)
@@ -404,8 +416,7 @@ void Session::add_magnet(rust::Str magnet_uri,
 
   ec.clear();
   std::vector<char> resume_data;
-  if (load_file(get_resume_file_path(atp.info_hashes.get_best().to_string()),
-                resume_data)) {
+  if (load_file(get_resume_file_path(atp.info_hashes.get_best()), resume_data)) {
     lt::add_torrent_params rd = lt::read_resume_data(resume_data, ec);
     if (ec)
       // TODO: add to log
@@ -415,6 +426,19 @@ void Session::add_magnet(rust::Str magnet_uri,
   }
 
   add_torrent_from_parmas(atp, torrent_param_list);
+}
+
+void Session::remove_torrent(rust::Str info_hash_str, bool delete_files) const {
+  lt::torrent_handle h = find_torrent_handle(info_hash_str);
+
+  if (!h.is_valid()) {
+    return;
+  }
+
+  // TODO: remove resume data
+
+  lt_session->remove_torrent(h, delete_files ? lt::session::delete_files
+                                             : lt::session::delete_partfile);
 }
 
 rust::Vec<TorrentInfo> Session::get_torrents() const {
@@ -439,24 +463,91 @@ TorrentInfo Session::get_torrent_info(rust::Str info_hash_str) const {
   return _get_torrent_info(*tf);
 }
 
-void Session::get_peers(rust::Str info_hash_str) {
+rust::Vec<PeerInfo> Session::get_peers(rust::Str info_hash_str) {
   lt::torrent_handle h = find_torrent_handle(info_hash_str);
 
   if (!h.is_valid()) {
-    return;
+    return rust::Vec<PeerInfo>();
   }
 
   h.post_peer_info();
   pop_alerts();
 
-  // TODO: return peers info
+  rust::Vec<PeerInfo> ret;
+  std::vector<lt::peer_info> peers = m_peer_state.get_peers(h);
+  for (auto& peer : peers) {
+    PeerInfo pi;
+    pi.client = peer.client;
+
+    for (auto i : peer.pieces.range()) {
+      bool have = peer.pieces[i];
+      pi.pieces.push_back(have);
+    }
+
+    pi.total_download = peer.total_download;
+    pi.total_upload = peer.total_upload;
+
+    pi.last_request = peer.last_request.count();
+    pi.last_active = peer.last_active.count();
+
+    pi.download_queue_time = peer.download_queue_time.count();
+
+    pi.flags = static_cast<uint32_t>(peer.flags);
+
+    pi.source = static_cast<uint8_t>(peer.source);
+    pi.up_speed = peer.up_speed;
+    pi.down_speed = peer.down_speed;
+    pi.payload_up_speed = peer.payload_up_speed;
+    pi.payload_down_speed = peer.payload_down_speed;
+    pi.pid = to_hex(peer.pid);
+    pi.queue_bytes = peer.queue_bytes;
+    pi.request_timeout = peer.request_timeout;
+    pi.send_buffer_size = peer.send_buffer_size;
+    pi.used_send_buffer = peer.used_send_buffer;
+    pi.receive_buffer_size = peer.receive_buffer_size;
+    pi.used_receive_buffer = peer.used_receive_buffer;
+    pi.receive_buffer_watermark = peer.receive_buffer_watermark;
+    pi.num_hashfails = peer.num_hashfails;
+    pi.download_queue_length = peer.download_queue_length;
+    pi.timed_out_requests = peer.timed_out_requests;
+    pi.busy_requests = peer.busy_requests;
+    pi.requests_in_buffer = peer.requests_in_buffer;
+    pi.target_dl_queue_length = peer.target_dl_queue_length;
+    pi.upload_queue_length = peer.upload_queue_length;
+    pi.failcount = peer.failcount;
+    pi.downloading_piece_index = static_cast<int32_t>(peer.downloading_piece_index);
+    pi.downloading_block_index = peer.downloading_block_index;
+    pi.downloading_progress = peer.downloading_progress;
+    pi.downloading_total = peer.downloading_total;
+    pi.connection_type = static_cast<uint8_t>(peer.connection_type);
+    pi.pending_disk_bytes = peer.pending_disk_bytes;
+    pi.pending_disk_read_bytes = peer.pending_disk_read_bytes;
+    pi.send_quota = peer.send_quota;
+    pi.receive_quota = peer.receive_quota;
+    pi.rtt = peer.rtt;
+    pi.num_pieces = peer.num_pieces;
+    pi.download_rate_peak = peer.download_rate_peak;
+    pi.upload_rate_peak = peer.upload_rate_peak;
+    pi.progress = peer.progress;
+    pi.progress_ppm = peer.progress_ppm;
+    pi.ip = peer.ip.address().to_string();
+    pi.local_endpoint = peer.local_endpoint.address().to_string();
+    pi.read_state = static_cast<uint8_t>(peer.read_state);
+    pi.write_state = static_cast<uint8_t>(peer.write_state);
+    pi.i2p_destination = to_hex(peer.i2p_destination());
+
+    ret.push_back(std::move(pi));
+  }
+
+  return ret;
 }
 
-void Session::get_file_progress(rust::Str info_hash_str, bool piece_granularity) {
+rust::Vec<std::int64_t> Session::get_file_progress(rust::Str info_hash_str,
+                                                   bool piece_granularity) {
   lt::torrent_handle h = find_torrent_handle(info_hash_str);
 
   if (!h.is_valid()) {
-    return;
+    return rust::Vec<std::int64_t>();
   }
 
   if (piece_granularity) {
@@ -466,33 +557,169 @@ void Session::get_file_progress(rust::Str info_hash_str, bool piece_granularity)
   }
   pop_alerts();
 
-  // TODO: return file progress
+  std::vector<std::int64_t> progress = m_file_progress_state.get_file_progress(h);
+  rust::Vec<std::int64_t> ret;
+  ret.reserve(progress.size());
+  for (auto& p : progress) {
+    ret.push_back(p);
+  }
+  return ret;
 }
 
-void Session::get_piece_availability(rust::Str info_hash_str) {
+rust::Vec<std::int32_t> Session::get_piece_availability(rust::Str info_hash_str) {
   lt::torrent_handle h = find_torrent_handle(info_hash_str);
 
   if (!h.is_valid()) {
-    return;
+    return rust::Vec<std::int32_t>();
   }
 
   h.post_piece_availability();
   pop_alerts();
 
-  // TODO: return piece availability
+  std::vector<std::int32_t> availability =
+      m_piece_availability_state.get_piece_availability(h);
+  rust::Vec<std::int32_t> ret;
+  ret.reserve(availability.size());
+  for (auto& p : availability) {
+    ret.push_back(p);
+  }
+  return ret;
 }
 
-void Session::get_trackers(rust::Str info_hash_str) {
+rust::Vec<AnnounceEntry> Session::get_trackers(rust::Str info_hash_str) {
+  lt::torrent_handle h = find_torrent_handle(info_hash_str);
+
+  if (!h.is_valid()) {
+    return rust::Vec<AnnounceEntry>();
+  }
+
+  h.post_trackers();
+  pop_alerts();
+
+  std::vector<lt::announce_entry> trackers = m_tracker_state.get_trackers(h);
+  rust::Vec<AnnounceEntry> ret;
+  ret.reserve(trackers.size());
+  for (auto& p : trackers) {
+    AnnounceEntry ae;
+    ae.url = p.url;
+    ae.trackerid = p.trackerid;
+    ae.tier = p.tier;
+    ae.fail_limit = p.fail_limit;
+    ae.source = p.source;
+    ae.verified = p.verified;
+
+    rust::Vec<AnnounceEndpoint> endpoints;
+    for (auto& ep : p.endpoints) {
+      AnnounceEndpoint endpoint;
+      endpoint.local_endpoint = endpoint_to_string(ep.local_endpoint);
+
+      rust::Vec<AnnounceInfoHash> info_hashes;
+      for (lt::protocol_version const v :
+           {lt::protocol_version::V1, lt::protocol_version::V2}) {
+        AnnounceInfoHash info_hash;
+        auto const& av = ep.info_hashes[v];
+        info_hash.message = av.message;
+        info_hash.last_error = av.last_error.message();
+        info_hash.next_announce = av.next_announce.time_since_epoch().count();
+        info_hash.min_announce = av.min_announce.time_since_epoch().count();
+
+        info_hash.scrape_complete = av.scrape_complete;
+        info_hash.scrape_incomplete = av.scrape_incomplete;
+        info_hash.scrape_downloaded = av.scrape_downloaded;
+
+        info_hash.fails = av.fails;
+        info_hash.updating = av.updating;
+        info_hash.start_sent = av.start_sent;
+        info_hash.complete_sent = av.complete_sent;
+        info_hash.triggered_manually = av.triggered_manually;
+
+        info_hashes.push_back(info_hash);
+      }
+      endpoint.info_hashes = info_hashes;
+
+      endpoints.push_back(endpoint);
+    }
+    ae.endpoints = endpoints;
+
+    ret.push_back(ae);
+  }
+
+  return ret;
+}
+
+void Session::scrape_tracker(rust::Str info_hash_str) const {
   lt::torrent_handle h = find_torrent_handle(info_hash_str);
 
   if (!h.is_valid()) {
     return;
   }
 
-  h.post_trackers();
-  pop_alerts();
+  h.scrape_tracker();
+}
 
-  // TODO: return trackers
+void Session::force_recheck(rust::Str info_hash_str) const {
+  lt::torrent_handle h = find_torrent_handle(info_hash_str);
+
+  if (!h.is_valid()) {
+    return;
+  }
+
+  h.force_recheck();
+}
+
+void Session::force_reannounce(rust::Str info_hash_str) const {
+  lt::torrent_handle h = find_torrent_handle(info_hash_str);
+
+  if (!h.is_valid()) {
+    return;
+  }
+
+  h.force_reannounce();
+}
+
+void Session::clear_error(rust::Str info_hash_str) const {
+  lt::torrent_handle h = find_torrent_handle(info_hash_str);
+
+  if (!h.is_valid()) {
+    return;
+  }
+
+  h.clear_error();
+}
+
+void Session::pause() const { lt_session->pause(); }
+void Session::resume() const { lt_session->resume(); }
+bool Session::is_paused() const { return lt_session->is_paused(); }
+
+void Session::set_flags(rust::Str info_hash_str, std::uint64_t flags) const {
+  lt::torrent_handle h = find_torrent_handle(info_hash_str);
+
+  if (!h.is_valid()) {
+    return;
+  }
+
+  h.set_flags(lt::torrent_flags_t(flags));
+}
+
+void Session::set_flags_with_mask(rust::Str info_hash_str, std::uint64_t flags,
+                                  std::uint64_t mask) const {
+  lt::torrent_handle h = find_torrent_handle(info_hash_str);
+
+  if (!h.is_valid()) {
+    return;
+  }
+
+  h.set_flags(lt::torrent_flags_t(flags), lt::torrent_flags_t(mask));
+}
+
+void Session::unset_flags(rust::Str info_hash_str, std::uint64_t flags) const {
+  lt::torrent_handle h = find_torrent_handle(info_hash_str);
+
+  if (!h.is_valid()) {
+    return;
+  }
+
+  h.unset_flags(lt::torrent_flags_t(flags));
 }
 
 // Handle an alert
@@ -551,30 +778,10 @@ void Session::handle_alert(lt::alert* a) {
       torrent_handle h = p->handle;
       h.save_resume_data(torrent_handle::save_info_dict |
                          torrent_handle::if_metadata_changed);
-
-      // TODO: add specified peers
-      // if we have a peer specified, connect to it
-      // if (!peer.empty())
-      // {
-      // 	auto port = peer.find_last_of(':');
-      // 	if (port != std::string::npos)
-      // 	{
-      // 		peer[port++] = '\0';
-      // 		char const* ip = peer.data();
-      // 		int const peer_port = atoi(peer.data() + port);
-      // 		error_code ec;
-      // 		if (peer_port > 0)
-      // 			h.connect_peer(tcp::endpoint(make_address(ip,
-      // ec), std::uint16_t(peer_port)));
-      // 	}
-      // }
     }
   }
 
   if (torrent_finished_alert* p = alert_cast<torrent_finished_alert>(a)) {
-    // TODO: set max connections
-    // p->handle.set_max_connections(max_connections_per_torrent / 2);
-
     // write resume data for the finished torrent
     // the alert handler for save_resume_data_alert
     // will save it to disk
@@ -587,8 +794,13 @@ void Session::handle_alert(lt::alert* a) {
     auto const buf = write_resume_data_buf(p->params);
     auto resume_file =
         // TODO: save file
-        get_resume_file_path(p->params.info_hashes.get_best().to_string());
-    // save_file(resume_file, buf);
+        get_resume_file_path(p->params.info_hashes.get_best());
+
+    bool ok = save_file(resume_file, buf);
+
+    if (!ok) {
+      std::fprintf(stderr, "failed to save resume data: %s\n", resume_file.c_str());
+    }
   }
 
   // TODO: handle the error
@@ -632,18 +844,20 @@ void Session::pop_alerts() {
 }
 
 void Session::poll_alerts() {
-  std::thread poll_thread([this]() {
-    auto ses = this->lt_session;
-    while (ses) {
-      ses->post_session_stats();
-      ses->post_torrent_updates();
-      ses->post_dht_stats();
-
-      this->pop_alerts();
-
-      std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  while (true) {
+    auto ses = lt_session;
+    if (!ses->is_valid() || !m_running) {
+      break;
     }
-  });
+
+    ses->post_session_stats();
+    ses->post_torrent_updates();
+    ses->post_dht_stats();
+
+    pop_alerts();
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  }
 }
 
 lt::torrent_handle Session::find_torrent_handle(rust::Str info_hash_str) const {
