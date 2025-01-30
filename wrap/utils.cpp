@@ -1,6 +1,9 @@
 #include "utils.hpp"
 #include "rust/cxx.h"
 
+#include "../libtorrent/include/libtorrent/address.hpp"
+#include "../libtorrent/include/libtorrent/socket.hpp"
+
 #include <fstream>
 #include <ios>
 #include <sstream>
@@ -23,9 +26,22 @@ bool load_file(std::string const& filename, std::vector<char>& v, int limit) {
   return !f.fail();
 }
 
+bool save_file(std::string const& filename, std::vector<char> const& v) {
+  std::fstream f(filename,
+                 std::ios_base::trunc | std::ios_base::out | std::ios_base::binary);
+  f.write(v.data(), int(v.size()));
+  return !f.fail();
+}
+
 std::string rust_str_to_string(rust::Str s) { return std::string(s.data(), s.length()); }
 
 std::string to_hex(lt::sha1_hash const& s) {
+  std::stringstream ret;
+  ret << s;
+  return ret.str();
+}
+
+std::string to_hex(lt::sha256_hash const& s) {
   std::stringstream ret;
   ret << s;
   return ret.str();
@@ -43,6 +59,16 @@ lt::sha1_hash from_hex(std::string const& hex) {
   }
 
   return lt::sha1_hash(bytes);
+}
+
+std::string endpoint_to_string(lt::tcp::endpoint const& ep) {
+  char buf[200];
+  lt::address const& addr = ep.address();
+  if (addr.is_v6())
+    std::snprintf(buf, sizeof(buf), "[%s]:%d", addr.to_string().c_str(), ep.port());
+  else
+    std::snprintf(buf, sizeof(buf), "%s:%d", addr.to_string().c_str(), ep.port());
+  return buf;
 }
 
 } // namespace libtorrent_wrapper
