@@ -288,6 +288,82 @@ pub mod ffi {
         pub i2p_destination: String,
     }
 
+    /// libtorrent/torrent_handle.hpp
+    ///
+    // holds the state of a block in a piece. Who we requested
+    // it from and how far along we are at downloading it.
+    #[derive(Debug)]
+    pub struct BlockInfo {
+        // the number of bytes that have been received for this block
+        bytes_progress: u32, // default 15
+
+        // the total number of bytes in this block.
+        block_size: u32, // default 15
+
+        // the state this block is in (see block_state_t)
+        // this is the enum used for the block_info::state field.
+        //
+        // enum block_state_t
+        // {
+        // 	// This block has not been downloaded or requested form any peer.
+        // 	none,
+        // 	// The block has been requested, but not completely downloaded yet.
+        // 	requested,
+        // 	// The block has been downloaded and is currently queued for being
+        // 	// written to disk.
+        // 	writing,
+        // 	// The block has been written to disk.
+        // 	finished
+        // };
+        state: u8, // default 2
+
+        // the number of peers that is currently requesting this block. Typically
+        // this is 0 or 1, but at the end of the torrent blocks may be requested
+        // by more peers in parallel to speed things up.
+        num_peers: u32, // default 14
+    }
+
+    /// libtorrent/torrent_handle.hpp
+    ///
+    /// This class holds information about pieces that have outstanding requests
+    /// or outstanding writes
+    #[derive(Debug)]
+    pub struct PartialPieceInfo {
+        // the index of the piece in question. ``blocks_in_piece`` is the number
+        // of blocks in this particular piece. This number will be the same for
+        // most pieces, but
+        // the last piece may have fewer blocks than the standard pieces.
+        pub piece_index: i32,
+
+        // the number of blocks in this piece
+        pub blocks_in_piece: i32,
+
+        // the number of blocks that are in the finished state
+        pub finished: i32,
+
+        // the number of blocks that are in the writing state
+        pub writing: i32,
+
+        // the number of blocks that are in the requested state
+        pub requested: i32,
+
+        // this is an array of ``blocks_in_piece`` number of
+        // items. One for each block in the piece.
+        //
+        // .. warning:: This is a pointer that points to an array
+        //	that's owned by the session object. The next time
+        //	get_download_queue() is called, it will be invalidated.
+        //	In the case of piece_info_alert, these pointers point into the alert
+        //	object itself, and will be invalidated when the alert destruct.
+        pub blocks: Vec<BlockInfo>,
+    }
+
+    #[derive(Debug)]
+    pub struct PieceInfo {
+        partial_pieces: Vec<PartialPieceInfo>,
+        blocks: Vec<BlockInfo>,
+    }
+
     /// libtorrent/announce_entry.hpp
     ///
     #[derive(Debug)]
@@ -408,10 +484,17 @@ pub mod ffi {
         pub verified: bool, // default 1
     }
 
+    #[derive(Debug)]
+    pub struct Log {
+        pub message: String,
+        pub timestamp: i64,
+    }
+
     unsafe extern "C++" {
         include!("libtorrent-rasterbar-sys/wrap/wrapper.hpp");
 
         type Session;
+        type TorrentHandle;
 
         /// Create a new session
         fn create_session(
@@ -420,23 +503,67 @@ pub mod ffi {
             session_state_path: &str,
             resume_dir: &str,
             torrent_dir: &str,
+            log_size: u32,
         ) -> Result<UniquePtr<Session>>;
 
-        fn add_torrent(&self, torrent_path: &str, torrent_param_list: &[ParamPair]) -> Result<()>;
+        // Session impl
+        // {{{
+        fn add_torrent(self: &Session, torrent_path: &str, torrent_param_list: &[ParamPair]) -> Result<()>;
 
-        fn add_magnet(&self, magnet_uri: &str, torrent_param_list: &[ParamPair]) -> Result<()>;
+        fn add_magnet(self: &Session, magnet_uri: &str, torrent_param_list: &[ParamPair]) -> Result<()>;
+
+        fn get_torrent_handle(self: &Session, info_hash_str: &str) -> UniquePtr<TorrentHandle>;
+
+        fn pause(self: &Session);
+        fn resume(self: &Session);
+        fn is_paused(self: &Session) -> bool;
 
         /// Get the list of torrents in the session
-        fn get_torrents(&self) -> Vec<TorrentInfo>;
+        fn get_torrents(self: &Session) -> Vec<TorrentInfo>;
 
-        fn get_torrent_info(&self, info_hash_str: &str) -> TorrentInfo;
+        fn get_logs(self: Pin<&mut Session>) -> Vec<Log>;
+        // }}}
 
-        fn get_peers(self: Pin<&mut Self>, info_hash_str: &str) -> Vec<PeerInfo>;
+        // TorrentHandle impl
+        // {{{
+        fn is_valid(self: &TorrentHandle) -> bool;
 
-        fn get_file_progress(self: Pin<&mut Self>, info_hash_str: &str, piece_granularity: bool) -> Vec<i64>;
+        fn add_tracker(self: &TorrentHandle, tracker_url: &str, tier: u8);
 
-        fn get_piece_availability(self: Pin<&mut Self>, info_hash_str: &str) -> Vec<i32>;
+        fn scrape_tracker(self: &TorrentHandle);
+        fn force_recheck(self: &TorrentHandle);
+        fn force_reannounce(self: &TorrentHandle);
+        fn clear_error(self: &TorrentHandle);
 
-        fn get_trackers(self: Pin<&mut Self>, info_hash_str: &str) -> Vec<AnnounceEntry>;
+        // sets and gets the torrent state flags. See torrent_flags_t.
+        // The ``set_flags`` overload that take a mask will affect all
+        // flags part of the mask, and set their values to what the
+        // ``flags`` argument is set to. This allows clearing and
+        // setting flags in a single function call.
+        // The ``set_flags`` overload that just takes flags, sets all
+        // the specified flags and leave any other flags unchanged.
+        // ``unset_flags`` clears the specified flags, while leaving
+        // any other flags unchanged.
+        //
+        // The `seed_mode` flag is special, it can only be cleared once the
+        // torrent has been added, and it can only be set as part of the
+        // add_torrent_params flags, when adding the torrent.
+        fn set_flags(self: &TorrentHandle, flags: u64);
+        fn set_flags_with_mask(self: &TorrentHandle, flags: u64, mask: u64);
+        fn unset_flags(self: &TorrentHandle, flags: u64);
+
+        fn get_torrent_info(self: &TorrentHandle) -> TorrentInfo;
+
+        fn get_peers(self: &TorrentHandle) -> Vec<PeerInfo>;
+
+        fn get_file_progress(self: &TorrentHandle, piece_granularity: bool) -> Vec<i64>;
+
+        fn get_piece_info(self: &TorrentHandle) -> PieceInfo;
+
+        fn get_piece_availability(self: &TorrentHandle) -> Vec<i32>;
+
+        fn get_trackers(self: &TorrentHandle) -> Vec<AnnounceEntry>;
+        // }}}
+
     }
 }
