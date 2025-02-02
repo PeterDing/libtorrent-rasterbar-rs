@@ -166,14 +166,14 @@ void PieceInfoState::update_piece_info(lt::piece_info_alert* a) {
   }
 }
 
-// std::pair<std::vector<lt::partial_piece_info>, std::vector<lt::block_info>>
-// PieceInfoState::get_piece_info(lt::torrent_handle h) {
-//   auto i = m_all_piece_info.find(h);
-//   if (i == m_all_piece_info.end())
-//     return std::make_pair(std::vector<lt::partial_piece_info>(),
-//                           std::vector<lt::block_info>());
-//   return i->second;
-// }
+std::pair<std::vector<lt::partial_piece_info>, std::vector<lt::block_info>>
+PieceInfoState::get_piece_info(lt::torrent_handle h) {
+  auto i = m_all_piece_info.find(h);
+  if (i == m_all_piece_info.end())
+    return std::make_pair(std::vector<lt::partial_piece_info>(),
+                          std::vector<lt::block_info>());
+  return i->second;
+}
 
 void PieceInfoState::remove(lt::torrent_handle h) {
   auto i = m_all_piece_info.find(h);

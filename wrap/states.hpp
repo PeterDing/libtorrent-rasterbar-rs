@@ -114,8 +114,8 @@ public:
 
   void update_piece_info(lt::piece_info_alert* a);
 
-  // std::pair<std::vector<lt::partial_piece_info>, std::vector<lt::block_info>>
-  // get_piece_info(lt::torrent_handle h);
+  std::pair<std::vector<lt::partial_piece_info>, std::vector<lt::block_info>>
+  get_piece_info(lt::torrent_handle h);
 
   void remove(lt::torrent_handle h);
 
