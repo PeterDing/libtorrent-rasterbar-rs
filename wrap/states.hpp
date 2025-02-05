@@ -27,6 +27,9 @@ public:
   std::vector<std::int64_t> stats() const;
   std::vector<std::int64_t> prev_stats() const;
 
+  lt::clock_type::time_point timestamp() const;
+  lt::clock_type::time_point prev_timestamp() const;
+
   std::int64_t value(int idx) const;
   std::int64_t prev_value(int idx) const;
 
@@ -49,6 +52,9 @@ public:
   ~TorrentState();
 
   void update_torrents(lt::state_update_alert* a);
+
+  lt::torrent_status get_torrent_status(lt::torrent_handle h);
+
   void remove(lt::torrent_handle h);
 
 private:

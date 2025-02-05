@@ -18,6 +18,7 @@ struct ParamPair;
 struct DHTNode;
 struct FileEntry;
 struct TorrentInfo;
+struct TorrentStatus;
 struct PeerInfo;
 struct PartialPieceInfo;
 struct BlockInfo;
@@ -26,6 +27,7 @@ struct AnnounceInfoHash;
 struct AnnounceEndpoint;
 struct AnnounceEntry;
 struct Log;
+struct TwoSessionStats;
 
 class TorrentHandle;
 
@@ -46,6 +48,8 @@ public:
   std::unique_ptr<TorrentHandle> get_torrent_handle(rust::Str info_hash_str) const;
 
   void remove_torrent(rust::Str info_hash_str, bool delete_files) const;
+
+  TwoSessionStats get_stats() const;
 
   void pause() const;
   void resume() const;
@@ -110,7 +114,31 @@ public:
 
   void scrape_tracker() const;
   void force_recheck() const;
+
+  // ``force_reannounce()`` will force this torrent to do another tracker
+  // request, to receive new peers. The ``seconds`` argument specifies how
+  // many seconds from now to issue the tracker announces.
+  //
+  // If the tracker's ``min_interval`` has not passed since the last
+  // announce, the forced announce will be scheduled to happen immediately
+  // as the ``min_interval`` expires. This is to honor trackers minimum
+  // re-announce interval settings.
+  //
+  // The ``tracker_index`` argument specifies which tracker to re-announce.
+  // If set to -1 (which is the default), all trackers are re-announce.
+  //
+  // The ``flags`` argument can be used to affect the re-announce. See
+  // ignore_min_interval.
+  //
+  // ``force_dht_announce`` will announce the torrent to the DHT
+  // immediately.
+  //
+  // ``force_lsd_announce`` will announce the torrent on LSD
+  // immediately.
   void force_reannounce() const;
+  void force_dht_announce() const;
+  void force_lsd_announce() const;
+
   void clear_error() const;
 
   // ``set_upload_limit`` will limit the upload bandwidth used by this
@@ -187,6 +215,8 @@ public:
   rust::Vec<std::int32_t> get_piece_availability() const;
 
   rust::Vec<AnnounceEntry> get_trackers() const;
+
+  TorrentStatus get_torrent_status() const;
 
 private:
   lt::torrent_handle m_torrent_handle;

@@ -39,6 +39,10 @@ std::vector<std::int64_t> SessionStats::stats() const { return m_cnt[0]; }
 
 std::vector<std::int64_t> SessionStats::prev_stats() const { return m_cnt[1]; }
 
+lt::clock_type::time_point SessionStats::timestamp() const { return m_timestamp[0]; }
+
+lt::clock_type::time_point SessionStats::prev_timestamp() const { return m_timestamp[1]; }
+
 std::int64_t SessionStats::value(int idx) const {
   if (idx < 0)
     return 0;
@@ -66,6 +70,13 @@ void TorrentState::update_torrents(lt::state_update_alert* a) {
       j->second = std::move(t);
     }
   }
+}
+
+lt::torrent_status TorrentState::get_torrent_status(lt::torrent_handle h) {
+  auto i = m_all_torrents.find(h);
+  if (i == m_all_torrents.end())
+    return lt::torrent_status();
+  return i->second;
 }
 
 void TorrentState::remove(lt::torrent_handle h) {
