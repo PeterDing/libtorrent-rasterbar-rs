@@ -1,0 +1,44 @@
+name: Linux
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    continue-on-error: false
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 1
+          filter: tree:0
+
+      - name: update package lists
+        continue-on-error: true
+        run: |
+          sudo apt update
+
+      - uses: Chocobo1/setup-ccache-action@v1
+        with:
+          update_packager_index: false
+          override_cache_key: ccache-linux-build-${{ github.base_ref }}-${{ matrix.config }}
+          ccache_options: |
+            max_size=5G
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: install boost
+        run: |
+          sudo apt install libboost-python-dev libboost-tools-dev libboost-dev libboost-system-dev python3 clang libclang-dev build-essential
+          echo "using gcc ;" >>~/user-config.jam
+
+      - name: build
+        run: |
+          cargo build
