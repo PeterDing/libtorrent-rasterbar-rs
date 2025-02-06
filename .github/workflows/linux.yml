@@ -27,12 +27,14 @@ jobs:
       - uses: Chocobo1/setup-ccache-action@v1
         with:
           update_packager_index: false
-          override_cache_key: ccache-linux-build-${{ github.base_ref }}-${{ matrix.config }}
+          override_cache_key: ccache-linux-build-${{ github.base_ref }}
           ccache_options: |
             max_size=5G
 
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: nightly
 
       - name: install boost
         run: |
