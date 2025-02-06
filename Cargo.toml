@@ -8,3 +8,4 @@ libtorrent-rasterbar-sys = { path = "libtorrent-rasterbar-sys", version = "0.1.0
 thiserror = "2"
 cxx = "1.0"
 anyhow = "1.0.95"
+serde = { version = "1", features = ["derive"] }
