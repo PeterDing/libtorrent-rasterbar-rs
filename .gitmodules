@@ -1,3 +1,3 @@
 [submodule "arvidn/libtorrent"]
-  path = libtorrent
+  path = libtorrent-rasterbar-sys/libtorrent
   url = https://github.com/arvidn/libtorrent.git
