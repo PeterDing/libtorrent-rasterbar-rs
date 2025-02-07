@@ -525,6 +525,14 @@ void Session::remove_torrent(rust::Str info_hash_str, bool delete_files) const {
     lt::remove(resume_file, ec);
   }
 
+  // remove torrent file
+  ec.clear();
+  auto torrent_file = get_torrent_file_path(h.info_hashes().get_best());
+  if (lt::exists(torrent_file, ec)) {
+    ec.clear();
+    lt::remove(torrent_file, ec);
+  }
+
   lt_session->remove_torrent(h, delete_files ? lt::session::delete_files
                                              : lt::session::delete_partfile);
 }
