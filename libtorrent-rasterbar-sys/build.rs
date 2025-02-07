@@ -82,14 +82,13 @@ fn main() {
         .flag_if_supported("-fvisibility-inlines-hidden");
 
     // Warning flags
-    build.warnings(false).extra_warnings(false);
-    //     .flag_if_supported("-Wall")
-    //     .flag_if_supported("-Wextra")
-    //     .flag_if_supported("-Wpedantic")
-    //     .flag_if_supported("-Wvla")
-    //     .flag_if_supported("-Wno-inline")
-    //     .flag_if_supported("-Wno-noexcept-type")
-    //     .flag_if_supported("-Wno-format-zero-length");
+    build
+        .warnings(false)
+        .extra_warnings(false)
+        .flag_if_supported("-Wno-inline")
+        .flag_if_supported("-Wno-nonnull")
+        .flag_if_supported("-Wno-noexcept-type")
+        .flag_if_supported("-Wno-format-zero-length");
 
     // Template depth
     build.flag_if_supported("-ftemplate-depth-512");
