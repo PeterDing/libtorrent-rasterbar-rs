@@ -1,10 +1,12 @@
 use announce_entry::AnnounceEntry;
 use cxx::UniquePtr;
+
 use libtorrent_rasterbar_sys::ffi::{create_session, ParamPair, Session, TorrentHandle};
 
-pub use libtorrent_rasterbar_sys::flags::{SaveStateFlags, TorrentFlags};
+pub use libtorrent_rasterbar_sys::flags::{PauseFlags, SaveStateFlags, TorrentFlags};
 
 mod announce_entry;
+mod download_priority;
 mod errors;
 mod log;
 mod peer_info;
@@ -15,6 +17,7 @@ mod torrent_status;
 
 mod tests;
 
+pub use download_priority::DownloadPriority;
 pub use errors::{LTError, LTResult};
 pub use log::Log;
 pub use peer_info::PeerInfo;
@@ -164,6 +167,23 @@ impl LTTorrentHandle {
     /// The `seed_mode` flag is special, it can only be cleared once the
     /// torrent has been added, and it can only be set as part of the
     /// add_torrent_params flags, when adding the torrent.
+    pub fn flags(&self) -> u64 {
+        self.inner.flags()
+    }
+
+    /// sets and gets the torrent state flags. See torrent_flags_t.
+    /// The ``set_flags`` overload that take a mask will affect all
+    /// flags part of the mask, and set their values to what the
+    /// ``flags`` argument is set to. This allows clearing and
+    /// setting flags in a single function call.
+    /// The ``set_flags`` overload that just takes flags, sets all
+    /// the specified flags and leave any other flags unchanged.
+    /// ``unset_flags`` clears the specified flags, while leaving
+    /// any other flags unchanged.
+    ///
+    /// The `seed_mode` flag is special, it can only be cleared once the
+    /// torrent has been added, and it can only be set as part of the
+    /// add_torrent_params flags, when adding the torrent.
     ///
     /// flags: TorrentFlags
     pub fn set_flags(&self, flags: u64) {
@@ -206,6 +226,74 @@ impl LTTorrentHandle {
     /// flags: TorrentFlags
     pub fn unset_flags(&self, flags: u64) {
         self.inner.unset_flags(flags);
+    }
+
+    pub fn pause(&self) {
+        if !self.is_valid() {
+            return;
+        }
+
+        self.unset_flags(TorrentFlags::auto_managed.bits());
+        self.inner.pause(PauseFlags::graceful_pause.bits());
+    }
+
+    pub fn resume(&self) {
+        if !self.is_valid() {
+            return;
+        }
+
+        self.set_flags(TorrentFlags::auto_managed.bits());
+    }
+
+    /// ``index`` must be in the range [0, number_of_files).
+    ///
+    /// ``file_priority()`` queries or sets the priority of file ``index``.
+    ///
+    /// ``prioritize_files()`` takes a vector that has at as many elements as
+    /// there are files in the torrent. Each entry is the priority of that
+    /// file. The function sets the priorities of all the pieces in the
+    /// torrent based on the vector.
+    ///
+    /// ``get_file_priorities()`` returns a vector with the priorities of all
+    /// files.
+    ///
+    /// The priority values are the same as for piece_priority(). See
+    /// download_priority_t.
+    ///
+    /// Whenever a file priority is changed, all other piece priorities are
+    /// reset to match the file priorities. In order to maintain special
+    /// priorities for particular pieces, piece_priority() has to be called
+    /// again for those pieces.
+    ///
+    /// You cannot set the file priorities on a torrent that does not yet have
+    /// metadata or a torrent that is a seed. ``file_priority(int, int)`` and
+    /// prioritize_files() are both no-ops for such torrents.
+    ///
+    /// Since changing file priorities may involve disk operations (of moving
+    /// files in- and out of the part file), the internal accounting of file
+    /// priorities happen asynchronously. i.e. setting file priorities and then
+    /// immediately querying them may not yield the same priorities just set.
+    /// To synchronize with the priorities taking effect, wait for the
+    /// file_prio_alert.
+    ///
+    /// When combining file- and piece priorities, the resume file will record
+    /// both. When loading the resume data, the file priorities will be applied
+    /// first, then the piece priorities.
+    ///
+    /// Moving data from a file into the part file is currently not
+    /// supported. If a file has its priority set to 0 *after* it has already
+    /// been created, it will not be moved into the partfile.
+    pub fn set_file_priority(&self, index: i32, priority: u8) {
+        self.inner.set_file_priority(index, priority);
+    }
+    pub fn get_file_priority(&self, index: i32) -> u8 {
+        self.inner.get_file_priority(index)
+    }
+    pub fn set_prioritize_files(&self, files: &[u8]) {
+        self.inner.set_prioritize_files(files);
+    }
+    pub fn get_file_priorities(&self) -> Vec<u8> {
+        self.inner.get_file_priorities()
     }
 
     pub fn get_torrent_info(&self) -> TorrentInfo {
