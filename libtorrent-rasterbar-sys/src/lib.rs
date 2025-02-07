@@ -877,6 +877,28 @@ pub mod ffi {
         fn force_reannounce(self: &TorrentHandle);
         fn clear_error(self: &TorrentHandle);
 
+        // ``pause()``, and ``resume()`` will disconnect all peers and reconnect
+        // all peers respectively. When a torrent is paused, it will however
+        // remember all share ratios to all peers and remember all potential (not
+        // connected) peers. Torrents may be paused automatically if there is a
+        // file error (e.g. disk full) or something similar. See
+        // file_error_alert.
+        //
+        // For possible values of the ``flags`` parameter, see pause_flags_t.
+        //
+        // To know if a torrent is paused or not, call
+        // ``torrent_handle::flags()`` and check for the
+        // ``torrent_status::paused`` flag.
+        //
+        // .. note::
+        // 	Torrents that are auto-managed may be automatically resumed again. It
+        // 	does not make sense to pause an auto-managed torrent without making it
+        // 	not auto-managed first. Torrents are auto-managed by default when added
+        //
+        // 	to the session. For more information, see queuing_.
+        fn pause(self: &TorrentHandle, flags: u8);
+        fn resume(self: &TorrentHandle);
+
         // sets and gets the torrent state flags. See torrent_flags_t.
         // The ``set_flags`` overload that take a mask will affect all
         // flags part of the mask, and set their values to what the
@@ -890,9 +912,53 @@ pub mod ffi {
         // The `seed_mode` flag is special, it can only be cleared once the
         // torrent has been added, and it can only be set as part of the
         // add_torrent_params flags, when adding the torrent.
+        fn flags(self: &TorrentHandle) -> u64;
         fn set_flags(self: &TorrentHandle, flags: u64);
         fn set_flags_with_mask(self: &TorrentHandle, flags: u64, mask: u64);
         fn unset_flags(self: &TorrentHandle, flags: u64);
+
+        // ``index`` must be in the range [0, number_of_files).
+        //
+        // ``file_priority()`` queries or sets the priority of file ``index``.
+        //
+        // ``prioritize_files()`` takes a vector that has at as many elements as
+        // there are files in the torrent. Each entry is the priority of that
+        // file. The function sets the priorities of all the pieces in the
+        // torrent based on the vector.
+        //
+        // ``get_file_priorities()`` returns a vector with the priorities of all
+        // files.
+        //
+        // The priority values are the same as for piece_priority(). See
+        // download_priority_t.
+        //
+        // Whenever a file priority is changed, all other piece priorities are
+        // reset to match the file priorities. In order to maintain special
+        // priorities for particular pieces, piece_priority() has to be called
+        // again for those pieces.
+        //
+        // You cannot set the file priorities on a torrent that does not yet have
+        // metadata or a torrent that is a seed. ``file_priority(int, int)`` and
+        // prioritize_files() are both no-ops for such torrents.
+        //
+        // Since changing file priorities may involve disk operations (of moving
+        // files in- and out of the part file), the internal accounting of file
+        // priorities happen asynchronously. i.e. setting file priorities and then
+        // immediately querying them may not yield the same priorities just set.
+        // To synchronize with the priorities taking effect, wait for the
+        // file_prio_alert.
+        //
+        // When combining file- and piece priorities, the resume file will record
+        // both. When loading the resume data, the file priorities will be applied
+        // first, then the piece priorities.
+        //
+        // Moving data from a file into the part file is currently not
+        // supported. If a file has its priority set to 0 *after* it has already
+        // been created, it will not be moved into the partfile.
+        fn set_file_priority(self: &TorrentHandle, index: i32, priority: u8);
+        fn get_file_priority(self: &TorrentHandle, index: i32) -> u8;
+        fn set_prioritize_files(self: &TorrentHandle, files: &[u8]);
+        fn get_file_priorities(self: &TorrentHandle) -> Vec<u8>;
 
         fn get_torrent_info(self: &TorrentHandle) -> TorrentInfo;
 

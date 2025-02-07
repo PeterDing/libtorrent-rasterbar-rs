@@ -5,6 +5,7 @@
 #include "../libtorrent/include/libtorrent/alert_types.hpp"
 #include "../libtorrent/include/libtorrent/announce_entry.hpp"
 #include "../libtorrent/include/libtorrent/aux_/path.hpp"
+#include "../libtorrent/include/libtorrent/download_priority.hpp"
 #include "../libtorrent/include/libtorrent/error_code.hpp"
 #include "../libtorrent/include/libtorrent/load_torrent.hpp"
 #include "../libtorrent/include/libtorrent/magnet_uri.hpp"
@@ -13,14 +14,17 @@
 #include "../libtorrent/include/libtorrent/string_view.hpp"
 #include "../libtorrent/include/libtorrent/time.hpp"
 #include "../libtorrent/include/libtorrent/torrent_flags.hpp"
+#include "../libtorrent/include/libtorrent/torrent_handle.hpp"
 #include "../libtorrent/include/libtorrent/write_resume_data.hpp"
 
 #include "libtorrent-rasterbar-sys/src/lib.rs.h"
 #include "states.hpp"
+#include "units.hpp"
 #include "utils.hpp"
 
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/split.hpp>
+#include <cstdio>
 #include <memory>
 #include <system_error>
 #include <thread>
@@ -105,17 +109,78 @@ Session::Session(lt::session_params params, std::string session_state_path,
   m_running = true;
 
   m_thread = std::make_shared<std::thread>([=] { poll_alerts(); });
+
+  // TODO: read all resume data
 }
 
 Session::~Session() {
-  lt_session->abort(); // asynchronous deconstruction
   m_running = false;
+
+  printf("Session destructor 1\n");
 
   if (m_thread) {
     m_thread->join();
   }
 
+  printf("Session destructor 2\n");
+
+  save_all_resume();
+
+  printf("Session destructor 3\n");
+
+  lt_session->abort(); // asynchronous deconstruction
   lt_session.reset();
+
+  printf("Session destructor 4\n");
+}
+
+void Session::save_all_resume() const {
+  int outstanding_resume_data; // counter of outstanding resume data
+  printf("outstanding_resume_data 1: %d\n", outstanding_resume_data);
+  std::vector<lt::torrent_handle> handles = lt_session->get_torrents();
+  for (lt::torrent_handle const& h : handles)
+    try {
+      h.save_resume_data(lt::torrent_handle::only_if_modified);
+      ++outstanding_resume_data;
+    } catch (lt::system_error const& e) {
+      // the handle was invalid, ignore this one and move to the next
+    }
+  printf("outstanding_resume_data 2: %d\n", outstanding_resume_data);
+
+  while (outstanding_resume_data > 0) {
+    printf("outstanding_resume_data 3: %d\n", outstanding_resume_data);
+    lt::alert const* a = lt_session->wait_for_alert(lt::seconds(30));
+
+    // if we don't get an alert within 30 seconds, abort
+    if (a == nullptr)
+      break;
+
+    std::vector<lt::alert*> alerts;
+    lt_session->pop_alerts(&alerts);
+
+    for (lt::alert* i : alerts) {
+      if (lt::alert_cast<lt::save_resume_data_failed_alert>(i)) {
+        --outstanding_resume_data;
+        continue;
+      }
+
+      lt::save_resume_data_alert const* p = lt::alert_cast<lt::save_resume_data_alert>(i);
+      if (p == nullptr) {
+        continue;
+      }
+
+      auto const buf = write_resume_data_buf(p->params);
+      auto resume_file = get_resume_file_path(p->params.info_hashes.get_best());
+
+      bool ok = save_file(resume_file, buf);
+
+      if (!ok) {
+        std::fprintf(stderr, "failed to save resume data: %s\n", resume_file.c_str());
+      }
+
+      --outstanding_resume_data;
+    }
+  }
 }
 
 void assign_session_setting(lt::settings_pack& settings, std::string const& key,
@@ -291,6 +356,13 @@ std::string Session::get_resume_file_path(lt::sha1_hash info_hash) const {
   return resume_file;
 }
 
+std::string Session::get_torrent_file_path(lt::sha1_hash info_hash) const {
+  std::string info_hash_str = to_hex(info_hash);
+  std::string torrent_file(m_torrent_dir);
+  lt::append_path(torrent_file, info_hash_str + ".torrent");
+  return torrent_file;
+}
+
 void assign_torrent_setting(lt::add_torrent_params& atp, std::string const& key,
                             std::string const& value) {
   using namespace lt::literals;
@@ -445,7 +517,13 @@ void Session::remove_torrent(rust::Str info_hash_str, bool delete_files) const {
     return;
   }
 
-  // TODO: remove resume data
+  // remove resume data
+  lt::error_code ec;
+  auto resume_file = get_resume_file_path(h.info_hashes().get_best());
+  if (lt::exists(resume_file, ec)) {
+    ec.clear();
+    lt::remove(resume_file, ec);
+  }
 
   lt_session->remove_torrent(h, delete_files ? lt::session::delete_files
                                              : lt::session::delete_partfile);
@@ -564,15 +642,41 @@ bool Session::handle_alert(lt::alert* a) {
 
   if (save_resume_data_alert* p = alert_cast<save_resume_data_alert>(a)) {
     auto const buf = write_resume_data_buf(p->params);
-    auto resume_file =
-        // TODO: save file
-        get_resume_file_path(p->params.info_hashes.get_best());
+    auto resume_file = get_resume_file_path(p->params.info_hashes.get_best());
 
     bool ok = save_file(resume_file, buf);
 
     if (!ok) {
       std::fprintf(stderr, "failed to save resume data: %s\n", resume_file.c_str());
+      return false;
     }
+
+    // save torrent file
+    lt::error_code ec;
+    auto torrent_file = get_torrent_file_path(p->params.info_hashes.get_best());
+    if (!lt::exists(torrent_file, ec)) {
+      try {
+        lt::entry e =
+            lt::write_torrent_file(p->params, lt::write_flags::allow_missing_piece_layer);
+
+        printf("Saving torrent file: %s\n", torrent_file.c_str());
+
+        std::vector<char> torrent;
+        lt::bencode(std::back_inserter(torrent), e);
+
+        ok = save_file(torrent_file, torrent);
+
+        if (!ok) {
+          std::fprintf(stderr, "failed to save torrent file 1: %s\n",
+                       torrent_file.c_str());
+          return false;
+        }
+      } catch (lt::system_error const& e) {
+        std::fprintf(stderr, "failed to save torrent file 2: %s\n", torrent_file.c_str());
+        return false;
+      }
+    }
+
     return false;
   }
 
@@ -630,9 +734,10 @@ void Session::pop_alerts() {
 }
 
 void Session::poll_alerts() {
+  auto ses = lt_session;
   while (true) {
-    auto ses = lt_session;
     if (!ses->is_valid() || !m_running) {
+      printf("Session::poll_alerts exit\n");
       break;
     }
 
@@ -816,6 +921,36 @@ int TorrentHandle::max_connections() const {
   return h.max_connections();
 }
 
+void TorrentHandle::pause(uint8_t flags) const {
+  lt::torrent_handle h = m_torrent_handle;
+
+  if (!h.is_valid()) {
+    return;
+  }
+
+  h.pause(lt::pause_flags_t(flags));
+}
+
+void TorrentHandle::resume() const {
+  lt::torrent_handle h = m_torrent_handle;
+
+  if (!h.is_valid()) {
+    return;
+  }
+
+  h.resume();
+}
+
+std::uint64_t TorrentHandle::flags() const {
+  lt::torrent_handle h = m_torrent_handle;
+
+  if (!h.is_valid()) {
+    return 0;
+  }
+
+  return static_cast<std::uint64_t>(h.flags());
+}
+
 void TorrentHandle::set_flags(std::uint64_t flags) const {
   lt::torrent_handle h = m_torrent_handle;
 
@@ -844,6 +979,70 @@ void TorrentHandle::unset_flags(std::uint64_t flags) const {
   }
 
   h.unset_flags(lt::torrent_flags_t(flags));
+}
+
+void TorrentHandle::set_file_priority(std::int32_t index, std::uint8_t priority) const {
+  lt::torrent_handle h = m_torrent_handle;
+
+  if (!h.is_valid()) {
+    return;
+  }
+
+  h.file_priority(static_cast<lt::file_index_t>(index),
+                  static_cast<lt::download_priority_t>(priority));
+}
+
+std::uint8_t TorrentHandle::get_file_priority(std::int32_t index) const {
+  lt::torrent_handle h = m_torrent_handle;
+
+  if (!h.is_valid()) {
+    return 0;
+  }
+
+  return static_cast<std::uint8_t>(h.file_priority(static_cast<lt::file_index_t>(index)));
+}
+
+void TorrentHandle::set_prioritize_files(
+    rust::Slice<const std::uint8_t> const files) const {
+  lt::torrent_handle h = m_torrent_handle;
+
+  if (!h.is_valid()) {
+    return;
+  }
+
+  std::vector<lt::download_priority_t> priorities;
+  for (auto p : files) {
+    priorities.push_back(static_cast<lt::download_priority_t>(p));
+  }
+
+  h.prioritize_files(priorities);
+}
+
+rust::Vec<std::uint8_t> TorrentHandle::get_file_priorities() const {
+  lt::torrent_handle h = m_torrent_handle;
+
+  if (!h.is_valid()) {
+    return rust::Vec<std::uint8_t>();
+  }
+
+  rust::Vec<std::uint8_t> ret;
+  std::vector<lt::download_priority_t> priorities = h.get_file_priorities();
+  for (auto p : priorities) {
+    ret.push_back(static_cast<std::uint8_t>(p));
+  }
+
+  return ret;
+}
+
+TorrentInfo TorrentHandle::get_torrent_info() const {
+  lt::torrent_handle h = m_torrent_handle;
+
+  if (!h.is_valid()) {
+    return TorrentInfo();
+  }
+
+  std::shared_ptr<const lt::torrent_info> tf = h.torrent_file();
+  return _get_torrent_info(*tf);
 }
 
 rust::Vec<PeerInfo> TorrentHandle::get_peers() const {
@@ -923,17 +1122,6 @@ rust::Vec<PeerInfo> TorrentHandle::get_peers() const {
   }
 
   return ret;
-}
-
-TorrentInfo TorrentHandle::get_torrent_info() const {
-  lt::torrent_handle h = m_torrent_handle;
-
-  if (!h.is_valid()) {
-    return TorrentInfo();
-  }
-
-  std::shared_ptr<const lt::torrent_info> tf = h.torrent_file();
-  return _get_torrent_info(*tf);
 }
 
 rust::Vec<std::int64_t> TorrentHandle::get_file_progress(bool piece_granularity) const {

@@ -65,13 +65,22 @@ private:
   void add_torrent_from_parmas(lt::add_torrent_params atp,
                                rust::Slice<const ParamPair> torrent_param_list) const;
 
+  std::string get_resume_file_path(lt::sha1_hash info_hash) const;
+  std::string get_torrent_file_path(lt::sha1_hash info_hash) const;
+
+  void pop_alerts();
+
+  bool handle_alert(lt::alert* a);
+
+  lt::torrent_handle find_torrent_handle(rust::Str info_hash_str) const;
+
+  void save_all_resume() const;
+
   std::string m_session_state_path;
   std::string m_resume_dir;
   std::string m_torrent_dir;
 
   std::shared_ptr<lt::session> lt_session;
-
-  std::string get_resume_file_path(lt::sha1_hash info_hash) const;
 
   SessionStats m_session_stats;
   TorrentState m_torrent_state;
@@ -84,11 +93,6 @@ private:
   TrackerState m_tracker_state;
 
   std::mutex m_pop_alerts_mutex; // protects pop_alerts
-  void pop_alerts();
-
-  bool handle_alert(lt::alert* a);
-
-  lt::torrent_handle find_torrent_handle(rust::Str info_hash_str) const;
 
   bool m_running;
   std::shared_ptr<std::thread> m_thread;
@@ -187,6 +191,28 @@ public:
   void set_max_connections(int max_connections) const;
   int max_connections() const;
 
+  // ``pause()``, and ``resume()`` will disconnect all peers and reconnect
+  // all peers respectively. When a torrent is paused, it will however
+  // remember all share ratios to all peers and remember all potential (not
+  // connected) peers. Torrents may be paused automatically if there is a
+  // file error (e.g. disk full) or something similar. See
+  // file_error_alert.
+  //
+  // For possible values of the ``flags`` parameter, see pause_flags_t.
+  //
+  // To know if a torrent is paused or not, call
+  // ``torrent_handle::flags()`` and check for the
+  // ``torrent_status::paused`` flag.
+  //
+  // .. note::
+  // 	Torrents that are auto-managed may be automatically resumed again. It
+  // 	does not make sense to pause an auto-managed torrent without making it
+  // 	not auto-managed first. Torrents are auto-managed by default when added
+  //
+  // 	to the session. For more information, see queuing_.
+  void pause(uint8_t flags) const;
+  void resume() const;
+
   // sets and gets the torrent state flags. See torrent_flags_t.
   // The ``set_flags`` overload that take a mask will affect all
   // flags part of the mask, and set their values to what the
@@ -200,9 +226,53 @@ public:
   // The `seed_mode` flag is special, it can only be cleared once the
   // torrent has been added, and it can only be set as part of the
   // add_torrent_params flags, when adding the torrent.
+  std::uint64_t flags() const;
   void set_flags(std::uint64_t flags) const;
   void set_flags_with_mask(std::uint64_t flags, std::uint64_t mask) const;
   void unset_flags(std::uint64_t flags) const;
+
+  // ``index`` must be in the range [0, number_of_files).
+  //
+  // ``file_priority()`` queries or sets the priority of file ``index``.
+  //
+  // ``prioritize_files()`` takes a vector that has at as many elements as
+  // there are files in the torrent. Each entry is the priority of that
+  // file. The function sets the priorities of all the pieces in the
+  // torrent based on the vector.
+  //
+  // ``get_file_priorities()`` returns a vector with the priorities of all
+  // files.
+  //
+  // The priority values are the same as for piece_priority(). See
+  // download_priority_t.
+  //
+  // Whenever a file priority is changed, all other piece priorities are
+  // reset to match the file priorities. In order to maintain special
+  // priorities for particular pieces, piece_priority() has to be called
+  // again for those pieces.
+  //
+  // You cannot set the file priorities on a torrent that does not yet have
+  // metadata or a torrent that is a seed. ``file_priority(int, int)`` and
+  // prioritize_files() are both no-ops for such torrents.
+  //
+  // Since changing file priorities may involve disk operations (of moving
+  // files in- and out of the part file), the internal accounting of file
+  // priorities happen asynchronously. i.e. setting file priorities and then
+  // immediately querying them may not yield the same priorities just set.
+  // To synchronize with the priorities taking effect, wait for the
+  // file_prio_alert.
+  //
+  // When combining file- and piece priorities, the resume file will record
+  // both. When loading the resume data, the file priorities will be applied
+  // first, then the piece priorities.
+  //
+  // Moving data from a file into the part file is currently not
+  // supported. If a file has its priority set to 0 *after* it has already
+  // been created, it will not be moved into the partfile.
+  void set_file_priority(std::int32_t index, std::uint8_t priority) const;
+  std::uint8_t get_file_priority(std::int32_t index) const;
+  void set_prioritize_files(rust::Slice<const std::uint8_t> const files) const;
+  rust::Vec<std::uint8_t> get_file_priorities() const;
 
   TorrentInfo get_torrent_info() const;
 
