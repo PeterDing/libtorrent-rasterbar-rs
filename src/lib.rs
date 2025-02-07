@@ -122,6 +122,9 @@ impl LTSession {
     }
 }
 
+unsafe impl Sync for LTSession {}
+unsafe impl Send for LTSession {}
+
 pub struct LTTorrentHandle {
     inner: UniquePtr<TorrentHandle>,
 }
