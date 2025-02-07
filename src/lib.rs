@@ -117,6 +117,14 @@ impl LTSession {
         self.inner.get_torrents().into_iter().map(TorrentInfo::from).collect()
     }
 
+    pub fn get_all_torrent_status(&self) -> Vec<TorrentStatus> {
+        self.inner
+            .get_all_torrent_status()
+            .into_iter()
+            .map(TorrentStatus::from)
+            .collect()
+    }
+
     pub fn get_logs(&mut self) -> Vec<Log> {
         self.inner.pin_mut().get_logs().into_iter().map(Log::from).collect()
     }
@@ -149,6 +157,7 @@ impl LTTorrentHandle {
     pub fn force_recheck(&self) {
         self.inner.force_recheck();
     }
+
     pub fn force_reannounce(&self) {
         self.inner.force_reannounce();
     }

@@ -405,6 +405,9 @@ pub mod ffi {
         pub announcing_to_lsd: bool,
         pub announcing_to_dht: bool,
 
+        // the info-hash for this torrent
+        pub info_hash: String,
+
         // the timestamps of the last time this torrent uploaded or downloaded
         // payload to any peer.
         pub last_upload: i64,
@@ -862,6 +865,9 @@ pub mod ffi {
 
         /// Get the list of torrents in the session
         fn get_torrents(self: &Session) -> Vec<TorrentInfo>;
+
+        /// Get the list of all torrent status in the session
+        fn get_all_torrent_status(self: &Session) -> Vec<TorrentStatus>;
 
         fn get_logs(self: Pin<&mut Session>) -> Vec<Log>;
         // }}}

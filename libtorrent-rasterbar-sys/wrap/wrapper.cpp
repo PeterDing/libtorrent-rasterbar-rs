@@ -33,7 +33,88 @@
 
 namespace libtorrent_wrapper {
 
-TorrentInfo _get_torrent_info(const lt::torrent_info& lt_ti) {
+TorrentStatus cast_torrent_status(lt::torrent_status const& ts) {
+  TorrentStatus ret;
+
+  ret.errc = ts.errc.message();
+  ret.error_file = static_cast<uint8_t>(ts.error_file);
+  ret.save_path = ts.save_path;
+  ret.name = ts.name;
+  ret.next_announce = ts.next_announce.count();
+  ret.current_tracker = ts.current_tracker;
+  ret.total_download = ts.total_download;
+  ret.total_upload = ts.total_upload;
+  ret.total_payload_download = ts.total_payload_download;
+  ret.total_payload_upload = ts.total_payload_upload;
+  ret.total_failed_bytes = ts.total_failed_bytes;
+  ret.total_redundant_bytes = ts.total_redundant_bytes;
+  for (auto i : ts.pieces.range()) {
+    bool have = ts.pieces[i];
+    ret.pieces.push_back(have);
+  }
+  for (auto i : ts.verified_pieces.range()) {
+    bool have = ts.pieces[i];
+    ret.verified_pieces.push_back(have);
+  }
+  ret.total_done = ts.total_done;
+  ret.total = ts.total;
+  ret.total_wanted_done = ts.total_wanted_done;
+  ret.total_wanted = ts.total_wanted;
+  ret.all_time_upload = ts.all_time_upload;
+  ret.all_time_download = ts.all_time_download;
+  ret.added_time = static_cast<std::int64_t>(ts.added_time);
+  ret.completed_time = static_cast<std::int64_t>(ts.completed_time);
+  ret.last_seen_complete = static_cast<std::int64_t>(ts.last_seen_complete);
+  ret.storage_mode = ts.storage_mode;
+  ret.progress = ts.progress;
+  ret.progress_ppm = ts.progress_ppm;
+  ret.queue_position = static_cast<std::int32_t>(ts.queue_position);
+  ret.download_rate = ts.download_rate;
+  ret.upload_rate = ts.upload_rate;
+  ret.download_payload_rate = ts.download_payload_rate;
+  ret.upload_payload_rate = ts.upload_payload_rate;
+  ret.num_seeds = ts.num_seeds;
+  ret.num_peers = ts.num_peers;
+  ret.num_complete = ts.num_complete;
+  ret.num_incomplete = ts.num_incomplete;
+  ret.list_seeds = ts.list_seeds;
+  ret.list_peers = ts.list_peers;
+  ret.connect_candidates = ts.connect_candidates;
+  ret.num_pieces = ts.num_pieces;
+  ret.distributed_full_copies = ts.distributed_full_copies;
+  ret.distributed_fraction = ts.distributed_fraction;
+  ret.distributed_copies = ts.distributed_copies;
+  ret.block_size = ts.block_size;
+  ret.num_uploads = ts.num_uploads;
+  ret.num_connections = ts.num_connections;
+  ret.uploads_limit = ts.uploads_limit;
+  ret.connections_limit = ts.connections_limit;
+  ret.up_bandwidth_queue = ts.up_bandwidth_queue;
+  ret.down_bandwidth_queue = ts.down_bandwidth_queue;
+  ret.seed_rank = ts.seed_rank;
+  ret.state = static_cast<std::uint8_t>(ts.state);
+  ret.need_save_resume = ts.need_save_resume;
+  ret.is_seeding = ts.is_seeding;
+  ret.is_finished = ts.is_finished;
+  ret.has_metadata = ts.has_metadata;
+  ret.has_incoming = ts.has_incoming;
+  ret.moving_storage = ts.moving_storage;
+  ret.announcing_to_trackers = ts.announcing_to_trackers;
+  ret.announcing_to_lsd = ts.announcing_to_lsd;
+  ret.announcing_to_dht = ts.announcing_to_dht;
+  ret.info_hash = to_hex(ts.info_hashes.get_best());
+  ret.last_upload = ts.last_upload.time_since_epoch().count() / 1000000; // milliseconds
+  ret.last_download =
+      ts.last_download.time_since_epoch().count() / 1000000; // milliseconds
+  ret.active_duration = ts.active_duration.count();
+  ret.finished_duration = ts.finished_duration.count();
+  ret.seeding_duration = ts.seeding_duration.count();
+  ret.flags = ts.flags;
+
+  return ret;
+}
+
+TorrentInfo cast_torrent_info(const lt::torrent_info& lt_ti) {
   TorrentInfo ti;
 
   // fill files
@@ -560,7 +641,16 @@ rust::Vec<TorrentInfo> Session::get_torrents() const {
   rust::Vec<TorrentInfo> ret;
   for (auto& h : handles) {
     std::shared_ptr<const lt::torrent_info> tf = h.torrent_file();
-    ret.push_back(_get_torrent_info(*tf));
+    ret.push_back(cast_torrent_info(*tf));
+  }
+  return ret;
+}
+
+rust::Vec<TorrentStatus> Session::get_all_torrent_status() const {
+  rust::Vec<TorrentStatus> ret;
+  ret.reserve(m_torrent_state.m_all_torrents.size());
+  for (auto& h : m_torrent_state.m_all_torrents) {
+    ret.push_back(cast_torrent_status(h.second));
   }
   return ret;
 }
@@ -1050,7 +1140,7 @@ TorrentInfo TorrentHandle::get_torrent_info() const {
   }
 
   std::shared_ptr<const lt::torrent_info> tf = h.torrent_file();
-  return _get_torrent_info(*tf);
+  return cast_torrent_info(*tf);
 }
 
 rust::Vec<PeerInfo> TorrentHandle::get_peers() const {
@@ -1293,83 +1383,7 @@ TorrentStatus TorrentHandle::get_torrent_status() const {
 
   lt::torrent_status ts = m_session->m_torrent_state.get_torrent_status(h);
 
-  TorrentStatus ret;
-
-  ret.errc = ts.errc.message();
-  ret.error_file = static_cast<uint8_t>(ts.error_file);
-  ret.save_path = ts.save_path;
-  ret.name = ts.name;
-  ret.next_announce = ts.next_announce.count();
-  ret.current_tracker = ts.current_tracker;
-  ret.total_download = ts.total_download;
-  ret.total_upload = ts.total_upload;
-  ret.total_payload_download = ts.total_payload_download;
-  ret.total_payload_upload = ts.total_payload_upload;
-  ret.total_failed_bytes = ts.total_failed_bytes;
-  ret.total_redundant_bytes = ts.total_redundant_bytes;
-  for (auto i : ts.pieces.range()) {
-    bool have = ts.pieces[i];
-    ret.pieces.push_back(have);
-  }
-  for (auto i : ts.verified_pieces.range()) {
-    bool have = ts.pieces[i];
-    ret.verified_pieces.push_back(have);
-  }
-  ret.total_done = ts.total_done;
-  ret.total = ts.total;
-  ret.total_wanted_done = ts.total_wanted_done;
-  ret.total_wanted = ts.total_wanted;
-  ret.all_time_upload = ts.all_time_upload;
-  ret.all_time_download = ts.all_time_download;
-  ret.added_time = static_cast<std::int64_t>(ts.added_time);
-  ret.completed_time = static_cast<std::int64_t>(ts.completed_time);
-  ret.last_seen_complete = static_cast<std::int64_t>(ts.last_seen_complete);
-  ret.storage_mode = ts.storage_mode;
-  ret.progress = ts.progress;
-  ret.progress_ppm = ts.progress_ppm;
-  ret.queue_position = static_cast<std::int32_t>(ts.queue_position);
-  ret.download_rate = ts.download_rate;
-  ret.upload_rate = ts.upload_rate;
-  ret.download_payload_rate = ts.download_payload_rate;
-  ret.upload_payload_rate = ts.upload_payload_rate;
-  ret.num_seeds = ts.num_seeds;
-  ret.num_peers = ts.num_peers;
-  ret.num_complete = ts.num_complete;
-  ret.num_incomplete = ts.num_incomplete;
-  ret.list_seeds = ts.list_seeds;
-  ret.list_peers = ts.list_peers;
-  ret.connect_candidates = ts.connect_candidates;
-  ret.num_pieces = ts.num_pieces;
-  ret.distributed_full_copies = ts.distributed_full_copies;
-  ret.distributed_fraction = ts.distributed_fraction;
-  ret.distributed_copies = ts.distributed_copies;
-  ret.block_size = ts.block_size;
-  ret.num_uploads = ts.num_uploads;
-  ret.num_connections = ts.num_connections;
-  ret.uploads_limit = ts.uploads_limit;
-  ret.connections_limit = ts.connections_limit;
-  ret.up_bandwidth_queue = ts.up_bandwidth_queue;
-  ret.down_bandwidth_queue = ts.down_bandwidth_queue;
-  ret.seed_rank = ts.seed_rank;
-  ret.state = static_cast<std::uint8_t>(ts.state);
-  ret.need_save_resume = ts.need_save_resume;
-  ret.is_seeding = ts.is_seeding;
-  ret.is_finished = ts.is_finished;
-  ret.has_metadata = ts.has_metadata;
-  ret.has_incoming = ts.has_incoming;
-  ret.moving_storage = ts.moving_storage;
-  ret.announcing_to_trackers = ts.announcing_to_trackers;
-  ret.announcing_to_lsd = ts.announcing_to_lsd;
-  ret.announcing_to_dht = ts.announcing_to_dht;
-  ret.last_upload = ts.last_upload.time_since_epoch().count() / 1000000; // milliseconds
-  ret.last_download =
-      ts.last_download.time_since_epoch().count() / 1000000; // milliseconds
-  ret.active_duration = ts.active_duration.count();
-  ret.finished_duration = ts.finished_duration.count();
-  ret.seeding_duration = ts.seeding_duration.count();
-  ret.flags = ts.flags;
-
-  return ret;
+  return cast_torrent_status(ts);
 }
 
 } // namespace libtorrent_wrapper

@@ -309,6 +309,9 @@ pub struct TorrentStatus {
     pub announcing_to_lsd: bool,
     pub announcing_to_dht: bool,
 
+    // the info-hash for this torrent
+    pub info_hash: String,
+
     // the timestamps of the last time this torrent uploaded or downloaded
     // payload to any peer.
     pub last_upload: i64,
@@ -394,6 +397,7 @@ impl From<ffi::TorrentStatus> for TorrentStatus {
             announcing_to_trackers: ts.announcing_to_trackers,
             announcing_to_lsd: ts.announcing_to_lsd,
             announcing_to_dht: ts.announcing_to_dht,
+            info_hash: ts.info_hash,
             last_upload: ts.last_upload,
             last_download: ts.last_download,
             active_duration: ts.active_duration,

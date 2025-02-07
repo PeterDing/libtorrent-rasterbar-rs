@@ -47,6 +47,8 @@ private:
 };
 
 class TorrentState {
+  friend class Session;
+
 public:
   TorrentState();
   ~TorrentState();

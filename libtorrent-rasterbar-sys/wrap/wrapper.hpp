@@ -57,6 +57,8 @@ public:
 
   rust::Vec<TorrentInfo> get_torrents() const;
 
+  rust::Vec<TorrentStatus> get_all_torrent_status() const;
+
   void poll_alerts();
 
   rust::Vec<Log> get_logs();
