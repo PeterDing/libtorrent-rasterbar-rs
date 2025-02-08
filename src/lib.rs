@@ -33,17 +33,47 @@ pub struct LTSession {
 
 impl LTSession {
     /// creates a new session.
+    ///
+    /// The default values of the session settings are set for a regular
+    /// bittorrent client running on a desktop system. There are functions that
+    /// can set the session settings to pre set settings for other environments.
+    /// These can be used for the basis, and should be tweaked to fit your needs
+    /// better.
+    ///
+    /// ``min_memory_usage`` returns settings that will use the minimal amount of
+    /// RAM, at the potential expense of upload and download performance. It
+    /// adjusts the socket buffer sizes, disables the disk cache, lowers the send
+    /// buffer watermarks so that each connection only has at most one block in
+    /// use at any one time. It lowers the outstanding blocks send to the disk
+    /// I/O thread so that connections only have one block waiting to be flushed
+    /// to disk at any given time. It lowers the max number of peers in the peer
+    /// list for torrents. It performs multiple smaller reads when it hashes
+    /// pieces, instead of reading it all into memory before hashing.
+    ///
+    /// This configuration is intended to be the starting point for embedded
+    /// devices. It will significantly reduce memory usage.
+    ///
+    /// ``high_performance_seed`` returns settings optimized for a seed box,
+    /// serving many peers and that doesn't do any downloading. It has a 128 MB
+    /// disk cache and has a limit of 400 files in its file pool. It support fast
+    /// upload rates by allowing large send buffers.
+    ///
+    /// ``session_param_list`` is a list of key-value pairs that will be used to
+    /// override the default values.
+    /// The definations and default values of the session settings are in
+    /// libtorrent/include/settings_pack.hpp
+    /// libtorrent/src/settings_pack.cpp
     pub fn new(
         min_memory_usage: bool,
         high_performance_seed: bool,
-        session_params: &[(&str, &str)],
+        session_param_list: &[(&str, &str)],
         save_state_flags: u32,
         session_state_path: &str,
         resume_dir: &str,
         torrent_dir: &str,
         log_size: u32,
     ) -> LTResult<Self> {
-        let params: Vec<_> = session_params
+        let params: Vec<_> = session_param_list
             .iter()
             .map(|(k, v)| ParamPair { key: k, value: v })
             .collect();

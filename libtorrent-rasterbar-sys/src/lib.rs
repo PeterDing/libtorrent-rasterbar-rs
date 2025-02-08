@@ -864,10 +864,13 @@ pub mod ffi {
         ///
         /// ``session_param_list`` is a list of key-value pairs that will be used to
         /// override the default values.
+        /// The definations and default values of the session settings are in
+        /// libtorrent/include/settings_pack.hpp
+        /// libtorrent/src/settings_pack.cpp
         fn create_session(
             min_memory_usage: bool,
             high_performance_seed: bool,
-            session_params: &[ParamPair],
+            session_param_list: &[ParamPair],
             save_state_flags: u32,
             session_state_path: &str,
             resume_dir: &str,
