@@ -275,7 +275,7 @@ pub mod ffi {
         /// will be set to the total number of peers that have the whole file and
         /// the total number of peers that are still downloading. set to -1 if the
         /// tracker did not send any scrape data in its announce reply.
-        pub num_complete: i32,   // default: -1
+        pub num_complete: i32, // default: -1
         pub num_incomplete: i32, // default: -1
 
         /// the number of seeds in our peer list and the total number of peers
@@ -878,8 +878,8 @@ pub mod ffi {
             log_size: u32,
         ) -> Result<UniquePtr<Session>>;
 
-        /// Session impl
-        /// {{{
+        // Session impl
+        // {{{
         fn add_torrent(self: &Session, torrent_path: &str, torrent_param_list: &[ParamPair]) -> Result<()>;
 
         fn add_magnet(self: &Session, magnet_uri: &str, torrent_param_list: &[ParamPair]) -> Result<()>;
@@ -901,10 +901,10 @@ pub mod ffi {
         fn get_all_torrent_status(self: &Session) -> Vec<TorrentStatus>;
 
         fn get_logs(self: Pin<&mut Session>) -> Vec<Log>;
-        /// }}}
+        // }}}
 
-        /// TorrentHandle impl
-        /// {{{
+        // TorrentHandle impl
+        // {{{
         fn is_valid(self: &TorrentHandle) -> bool;
 
         fn add_tracker(self: &TorrentHandle, tracker_url: &str, tier: u8);
@@ -1010,6 +1010,6 @@ pub mod ffi {
         fn get_trackers(self: &TorrentHandle) -> Vec<AnnounceEntry>;
 
         fn get_torrent_status(self: &TorrentHandle) -> TorrentStatus;
-/// }}}
+        // }}}
     }
 }
