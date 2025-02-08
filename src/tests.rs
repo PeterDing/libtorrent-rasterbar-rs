@@ -9,7 +9,7 @@ mod tests {
             ("alert_mask", "error,peer,port_mapping,storage,tracker,connect,status,ip_block,performance_warning,dht,incoming_request,dht_operation,port_mapping_log,file_progress",
             )
         ],
-            SaveStateFlags::SaveDhtState.bits(),
+            SaveStateFlags::save_dht_state.bits(),
             "/tmp/t/libtest/ses.state",
             "/tmp/t/libtest/resume",
             "/tmp/t/libtest/torrents",
@@ -33,6 +33,8 @@ mod tests {
         )
         .unwrap();
 
-        std::thread::sleep(std::time::Duration::from_secs(5000));
+        std::thread::sleep(std::time::Duration::from_secs(10));
+
+        std::thread::sleep(std::time::Duration::from_secs(100));
     }
 }
