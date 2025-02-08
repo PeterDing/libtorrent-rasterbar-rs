@@ -34,6 +34,8 @@ pub struct LTSession {
 impl LTSession {
     /// creates a new session.
     pub fn new(
+        min_memory_usage: bool,
+        high_performance_seed: bool,
         session_params: &[(&str, &str)],
         save_state_flags: u32,
         session_state_path: &str,
@@ -47,6 +49,8 @@ impl LTSession {
             .collect();
 
         let ses = create_session(
+            min_memory_usage,
+            high_performance_seed,
             &params,
             save_state_flags,
             session_state_path,
