@@ -380,7 +380,8 @@ void assign_session_setting(lt::settings_pack& settings, std::string const& key,
   }
 }
 
-std::unique_ptr<Session> create_session(rust::Slice<const ParamPair> session_param_list,
+std::unique_ptr<Session> create_session(bool min_memory_usage, bool high_performance_seed,
+                                        rust::Slice<const ParamPair> session_param_list,
                                         std::uint32_t save_state_flags,
                                         rust::Str session_state_path,
                                         rust::Str resume_dir, rust::Str torrent_dir,
@@ -396,6 +397,11 @@ std::unique_ptr<Session> create_session(rust::Slice<const ParamPair> session_par
   if (load_file(ssp, in)) {
     params = read_session_params(in, flags);
   }
+
+  if (min_memory_usage)
+    params.settings = lt::min_memory_usage();
+  if (high_performance_seed)
+    params.settings = lt::high_performance_seed();
 
   // make parent directories
   lt::error_code ec;
