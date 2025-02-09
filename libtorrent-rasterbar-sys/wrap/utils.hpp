@@ -32,5 +32,8 @@ lt::sha1_hash from_hex(std::string const& hex);
 // ipv4:port or [ipv6]:port
 std::string endpoint_to_string(lt::tcp::endpoint const& ep);
 
+// list files in a directory
+std::vector<std::string> list_dir(const std::string& dir, bool recursive = false);
+
 } // namespace libtorrent_wrapper
 #endif

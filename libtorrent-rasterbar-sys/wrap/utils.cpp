@@ -4,6 +4,7 @@
 #include "../libtorrent/include/libtorrent/address.hpp"
 #include "../libtorrent/include/libtorrent/socket.hpp"
 
+#include <boost/filesystem.hpp>
 #include <fstream>
 #include <ios>
 #include <sstream>
@@ -69,6 +70,44 @@ std::string endpoint_to_string(lt::tcp::endpoint const& ep) {
   else
     std::snprintf(buf, sizeof(buf), "%s:%d", addr.to_string().c_str(), ep.port());
   return buf;
+}
+
+std::vector<std::string> list_dir(const std::string& dir, bool recursive) {
+  std::vector<std::string> files;
+
+  namespace fs = boost::filesystem;
+
+  try {
+    // Check if directory exists
+    if (!fs::exists(dir)) {
+      return files;
+    }
+
+    // Check if path is a directory
+    if (!fs::is_directory(dir)) {
+      return files;
+    }
+
+    // Iterate through the directory
+    if (recursive) {
+      // Recursive directory iterator (includes subdirectories)
+      for (const auto& entry : fs::recursive_directory_iterator(dir)) {
+        if (fs::is_regular_file(entry.path())) {
+          files.push_back(entry.path().string());
+        }
+      }
+    } else {
+      // Regular directory iterator (only current directory)
+      for (const auto& entry : fs::directory_iterator(dir)) {
+        if (fs::is_regular_file(entry.path())) {
+          files.push_back(entry.path().string());
+        }
+      }
+    }
+  } catch (const std::exception& e) {
+  }
+
+  return files;
 }
 
 } // namespace libtorrent_wrapper
