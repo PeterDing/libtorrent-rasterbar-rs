@@ -70,6 +70,8 @@ private:
   std::string get_resume_file_path(lt::sha1_hash info_hash) const;
   std::string get_torrent_file_path(lt::sha1_hash info_hash) const;
 
+  void load_all_resume_data() const;
+
   void pop_alerts();
 
   bool handle_alert(lt::alert* a);

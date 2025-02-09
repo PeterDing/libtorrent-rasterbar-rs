@@ -26,6 +26,7 @@
 #include <boost/algorithm/string/split.hpp>
 #include <cstdio>
 #include <memory>
+#include <string>
 #include <system_error>
 #include <thread>
 #include <utility>
@@ -191,7 +192,8 @@ Session::Session(lt::session_params params, std::string session_state_path,
 
   m_thread = std::make_shared<std::thread>([=] { poll_alerts(); });
 
-  // TODO: read all resume data
+  // load all resume data
+  load_all_resume_data();
 }
 
 Session::~Session() {
@@ -448,6 +450,26 @@ std::string Session::get_torrent_file_path(lt::sha1_hash info_hash) const {
   std::string torrent_file(m_torrent_dir);
   lt::append_path(torrent_file, info_hash_str + ".torrent");
   return torrent_file;
+}
+
+void Session::load_all_resume_data() const {
+  std::vector<std::string> files = list_dir(m_resume_dir);
+  for (auto& f : files) {
+    if (!(f.size() > 7 && f.substr(f.size() - 7) == ".resume"))
+      continue;
+
+    lt::error_code ec;
+    std::vector<char> resume_data;
+    if (!load_file(f, resume_data)) {
+      continue;
+    }
+    lt::add_torrent_params p = lt::read_resume_data(resume_data, ec);
+    if (ec) {
+      continue;
+    }
+
+    lt_session->async_add_torrent(std::move(p));
+  }
 }
 
 void assign_torrent_setting(lt::add_torrent_params& atp, std::string const& key,
