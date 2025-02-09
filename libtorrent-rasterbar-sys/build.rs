@@ -13,6 +13,7 @@ fn pull_submodules() {
 fn main() {
     println!("cargo:rustc-link-lib=crypto");
     println!("cargo:rustc-link-lib=ssl");
+    println!("cargo:rustc-link-lib=boost_filesystem");
 
     pull_submodules();
 
