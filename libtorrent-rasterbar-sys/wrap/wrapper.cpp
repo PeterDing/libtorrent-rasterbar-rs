@@ -461,11 +461,12 @@ void Session::load_all_resume_data() const {
     if (!(f.size() > 7 && f.substr(f.size() - 7) == ".resume"))
       continue;
 
-    lt::error_code ec;
     std::vector<char> resume_data;
     if (!load_file(f, resume_data)) {
       continue;
     }
+
+    lt::error_code ec;
     lt::add_torrent_params p = lt::read_resume_data(resume_data, ec);
     if (ec) {
       continue;
@@ -493,6 +494,7 @@ void assign_torrent_setting(lt::add_torrent_params& atp, std::string const& key,
       auto it = std::find(atp.trackers.begin(), atp.trackers.end(), t);
       if (it != atp.trackers.end())
         continue;
+      printf("add trackers: %s\n", t.c_str());
       atp.trackers.emplace_back(t);
     }
   }
