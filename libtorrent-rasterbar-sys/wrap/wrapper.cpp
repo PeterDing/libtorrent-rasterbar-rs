@@ -218,7 +218,7 @@ Session::~Session() {
 }
 
 void Session::save_all_resume() const {
-  int outstanding_resume_data; // counter of outstanding resume data
+  int outstanding_resume_data = 0; // counter of outstanding resume data
   printf("outstanding_resume_data 1: %d\n", outstanding_resume_data);
   std::vector<lt::torrent_handle> handles = lt_session->get_torrents();
   for (lt::torrent_handle const& h : handles)
