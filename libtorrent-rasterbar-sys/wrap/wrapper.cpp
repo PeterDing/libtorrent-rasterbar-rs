@@ -243,6 +243,7 @@ void Session::save_all_resume() const {
 
     for (lt::alert* i : alerts) {
       if (lt::alert_cast<lt::save_resume_data_failed_alert>(i)) {
+        std::fprintf(stderr, "fails to save resume data");
         --outstanding_resume_data;
         continue;
       }
@@ -252,13 +253,15 @@ void Session::save_all_resume() const {
         continue;
       }
 
-      auto const buf = write_resume_data_buf(p->params);
+      auto const buf = lt::write_resume_data_buf(p->params);
       auto resume_file = get_resume_file_path(p->params.info_hashes.get_best());
 
       bool ok = save_file(resume_file, buf);
 
       if (!ok) {
         std::fprintf(stderr, "failed to save resume data: %s\n", resume_file.c_str());
+      } else {
+        std::fprintf(stderr, "saved resume data: %s\n", resume_file.c_str());
       }
 
       --outstanding_resume_data;
@@ -467,6 +470,8 @@ void Session::load_all_resume_data() const {
     if (ec) {
       continue;
     }
+
+    printf("load resume data: %s\n", f.c_str());
 
     lt_session->async_add_torrent(std::move(p));
   }
@@ -767,7 +772,7 @@ bool Session::handle_alert(lt::alert* a) {
   }
 
   if (save_resume_data_alert* p = alert_cast<save_resume_data_alert>(a)) {
-    auto const buf = write_resume_data_buf(p->params);
+    auto const buf = lt::write_resume_data_buf(p->params);
     auto resume_file = get_resume_file_path(p->params.info_hashes.get_best());
 
     bool ok = save_file(resume_file, buf);
