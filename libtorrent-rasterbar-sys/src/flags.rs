@@ -43,7 +43,7 @@ bitflags! {
         /// It is not possible to *set* the ``seed_mode`` flag on a torrent after it has
         /// been added to a session. It is possible to *clear* it though.
         /// constexpr torrent_flags_t seed_mode = 0_bit;
-        const seed_mode = 0;
+        const seed_mode = 1 << 0;
 
         /// If ``upload_mode`` is set, the torrent will be initialized in
         /// upload-mode, which means it will not make any piece requests. This
