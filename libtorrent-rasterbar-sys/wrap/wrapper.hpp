@@ -319,6 +319,8 @@ public:
 
   TorrentStatus get_torrent_status() const;
 
+  rust::String make_magnet_uri() const;
+
 private:
   lt::torrent_handle m_torrent_handle;
   Session* m_session;

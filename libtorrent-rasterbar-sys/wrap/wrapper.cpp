@@ -1421,4 +1421,14 @@ TorrentStatus TorrentHandle::get_torrent_status() const {
   return cast_torrent_status(ts);
 }
 
+rust::String TorrentHandle::make_magnet_uri() const {
+  lt::torrent_handle h = m_torrent_handle;
+
+  if (!h.is_valid()) {
+    return rust::String();
+  }
+
+  return lt::make_magnet_uri(h);
+}
+
 } // namespace libtorrent_wrapper

@@ -369,4 +369,8 @@ impl LTTorrentHandle {
     pub fn get_torrent_status(&self) -> TorrentStatus {
         self.inner.get_torrent_status().into()
     }
+
+    pub fn make_magnet_uri(&self) -> String {
+        self.inner.make_magnet_uri()
+    }
 }

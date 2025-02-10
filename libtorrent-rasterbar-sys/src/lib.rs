@@ -1010,6 +1010,8 @@ pub mod ffi {
         fn get_trackers(self: &TorrentHandle) -> Vec<AnnounceEntry>;
 
         fn get_torrent_status(self: &TorrentHandle) -> TorrentStatus;
+
+        fn make_magnet_uri(self: &TorrentHandle) -> String;
         // }}}
     }
 }
