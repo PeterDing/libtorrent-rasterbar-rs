@@ -24,7 +24,7 @@ pub use peer_info::PeerInfo;
 pub use piece_info::PieceInfo;
 pub use session_stats::{Metrics, SessionStats};
 pub use torrent_info::TorrentInfo;
-pub use torrent_status::TorrentStatus;
+pub use torrent_status::{State, TorrentStatus};
 
 /// the main libtorrent-rasterbar API.
 pub struct LTSession {

@@ -6,19 +6,21 @@ bitflags! {
     /// libtorrent/session_handler.hpp
     /// These flags are defined in struct session_handle
     pub struct SaveStateFlags: u32 {
-/// saves settings (i.e. the settings_pack)
-/// static constexpr save_state_flags_t save_settings = 0_bit;
+        /// saves settings (i.e. the settings_pack)
+        /// static constexpr save_state_flags_t save_settings = 0_bit;
         const save_settings = 1 << 0;
-/// saves dht state such as nodes and node-id, possibly accelerating
-/// joining the DHT if provided at next session startup.
-/// static constexpr save_state_flags_t save_dht_state = 2_bit;
+
+        /// saves dht state such as nodes and node-id, possibly accelerating
+        /// joining the DHT if provided at next session startup.
+        /// static constexpr save_state_flags_t save_dht_state = 2_bit;
         const save_dht_state = 1 << 2;
-/// load or save state from plugins
-/// static constexpr save_state_flags_t save_extension_state = 11_bit;
+
+        /// load or save state from plugins
+        /// static constexpr save_state_flags_t save_extension_state = 11_bit;
         const save_extension_state = 1 << 11;
 
-/// load or save the IP filter set on the session
-/// static constexpr save_state_flags_t save_ip_filter = 12_bit;
+        /// load or save the IP filter set on the session
+        /// static constexpr save_state_flags_t save_ip_filter = 12_bit;
         const save_ip_filter = 1 << 12;
     }
 }
@@ -36,10 +38,10 @@ bitflags! {
         /// if a torrent is created and seeded, or if the user already know
         /// that the files are complete, this is a way to avoid the initial
         /// file checks, and significantly reduce the startup time.
-        //
+        ///
         /// Setting ``seed_mode`` on a torrent without metadata (a
         /// .torrent file) is a no-op and will be ignored.
-        //
+        ///
         /// It is not possible to *set* the ``seed_mode`` flag on a torrent after it has
         /// been added to a session. It is possible to *clear* it though.
         /// constexpr torrent_flags_t seed_mode = 0_bit;
@@ -50,11 +52,11 @@ bitflags! {
         /// state is typically entered on disk I/O errors, and if the torrent
         /// is also auto managed, it will be taken out of this state
         /// periodically (see ``settings_pack::optimistic_disk_retry``).
-        //
+        ///
         /// This mode can be used to avoid race conditions when
         /// adjusting priorities of pieces before allowing the torrent to start
         /// downloading.
-        //
+        ///
         /// If the torrent is auto-managed (``auto_managed``), the torrent
         /// will eventually be taken out of upload-mode, regardless of how it
         /// got there. If it's important to manually control when the torrent
@@ -71,13 +73,13 @@ bitflags! {
         /// download anything. This mode is intended to be safe to add any
         /// number of torrents to, without manual screening, without the risk
         /// of downloading more than is uploaded.
-        //
+        ///
         /// A torrent in share mode sets the priority to all pieces to 0,
         /// except for the pieces that are downloaded, when pieces are decided
         /// to be downloaded. This affects the progress bar, which might be set
         /// to "100% finished" most of the time. Do not change file or piece
         /// priorities for torrents in share mode, it will make it not work.
-        //
+        ///
         /// The share mode has one setting, the share ratio target, see
         /// ``settings_pack::share_mode_target`` for more info.
         /// constexpr torrent_flags_t share_mode = 2_bit;
@@ -102,7 +104,7 @@ bitflags! {
         /// may be resumed at any point, regardless of how it paused. If it's
         /// important to manually control when the torrent is paused and
         /// resumed, don't make it auto managed.
-        //
+        ///
         /// If ``auto_managed`` is set, the torrent will be queued,
         /// started and seeded automatically by libtorrent. When this is set,
         /// the torrent should also be started as paused. The default queue
@@ -147,28 +149,28 @@ bitflags! {
         /// for instance, so it needs to be started and possibly queued for checking
         /// (auto-managed and started) but as soon as it's done, it should be
         /// stopped.
-        //
+        ///
         /// *Force stopped* means auto-managed is set to false and it's paused. As
         /// if the auto_manages flag is cleared and the paused flag is set on the torrent.
-        //
+        ///
         /// Note that the torrent may transition into a downloading state while
         /// setting this flag, and since the logic is edge triggered you may
         /// miss the edge. To avoid this race, if the torrent already is in a
         /// downloading state when this call is made, it will trigger the
         /// stop-when-ready immediately.
-        //
+        ///
         /// When the stop-when-ready logic fires, the flag is cleared. Any
         /// subsequent transitions between downloading and non-downloading states
         /// will not be affected, until this flag is set again.
-        //
+        ///
         /// The behavior is more robust when setting this flag as part of adding
         /// the torrent. See add_torrent_params.
-        //
+        ///
         /// The stop-when-ready flag fixes the inherent race condition of waiting
         /// for the state_changed_alert and then call pause(). The download/seeding
         /// will most likely start in between posting the alert and receiving the
         /// call to pause.
-        //
+        ///
         /// A downloading state is one where peers are being connected. Which means
         /// just downloading the metadata via the ``ut_metadata`` extension counts
         /// as a downloading state. In order to stop a torrent once the metadata
@@ -206,7 +208,7 @@ bitflags! {
         /// considered needing to save its resume data immediately, in the
         /// category if_metadata_changed. See resume_data_flags_t and
         /// save_resume_data() for details.
-        //
+        ///
         /// This flag is cleared by a successful call to save_resume_data()
         /// This flag is not saved by write_resume_data(), since it represents an
         /// ephemeral state of a running torrent.
