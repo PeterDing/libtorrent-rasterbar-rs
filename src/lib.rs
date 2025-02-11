@@ -3,7 +3,9 @@ use cxx::UniquePtr;
 
 use libtorrent_rasterbar_sys::ffi::{create_session, ParamPair, Session, TorrentHandle};
 
-pub use libtorrent_rasterbar_sys::flags::{PauseFlags, SaveStateFlags, TorrentFlags};
+pub use libtorrent_rasterbar_sys::flags::{
+    BandwidthStateFlags, ConnectionType, PauseFlags, PeerFlags, PeerSourceFlags, SaveStateFlags, TorrentFlags,
+};
 
 mod announce_entry;
 mod download_priority;

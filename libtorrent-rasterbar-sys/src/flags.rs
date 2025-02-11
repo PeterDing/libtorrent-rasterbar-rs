@@ -278,3 +278,184 @@ bitflags! {
         const graceful_pause = 1 << 0;
     }
 }
+
+bitflags! {
+    /// libtorrent/peer_info.hpp
+    ///
+    /// flags for the peer_info::flags field. Indicates various states
+    /// the peer may be in. These flags are not mutually exclusive, but
+    /// not every combination of them makes sense either.
+    ///
+    /// for peer_info.flags
+    pub struct PeerFlags: u32 {
+        /// **we** are interested in pieces from this peer.
+        const interesting = 1 << 0;
+
+        /// **we** have choked this peer.
+        const choked = 1 << 1;
+
+        /// the peer is interested in **us**
+        const remote_interested = 1 << 2;
+
+        /// the peer has choked **us**.
+        const remote_choked = 1 << 3;
+
+        /// means that this peer supports the
+        /// `extension protocol`__.
+        ///
+        /// __ extension_protocol.html
+        const supports_extensions = 1 << 4;
+
+        /// The connection was initiated by us, the peer has a
+        /// listen port open, and that port is the same as in the
+        /// address of this peer. If this flag is not set, this
+        /// peer connection was opened by this peer connecting to
+        /// us.
+        const outgoing_connection = 1 << 5;
+
+        /// deprecated synonym for outgoing_connection
+        const local_connection = 1 << 5;
+
+        /// The connection is opened, and waiting for the
+        /// handshake. Until the handshake is done, the peer
+        /// cannot be identified.
+        const handshake = 1 << 6;
+
+        /// The connection is in a half-open state (i.e. it is
+        /// being connected).
+        const connecting = 1 << 7;
+
+        /// The peer has participated in a piece that failed the
+        /// hash check, and is now "on parole", which means we're
+        /// only requesting whole pieces from this peer until
+        /// it either fails that piece or proves that it doesn't
+        /// send bad data.
+        const on_parole = 1 << 9;
+
+        /// This peer is a seed (it has all the pieces).
+        const seed = 1 << 10;
+
+        /// This peer is subject to an optimistic unchoke. It has
+        /// been unchoked for a while to see if it might unchoke
+        /// us in return an earn an upload/unchoke slot. If it
+        /// doesn't within some period of time, it will be choked
+        /// and another peer will be optimistically unchoked.
+        const optimistic_unchoke = 1 << 11;
+
+        /// This peer has recently failed to send a block within
+        /// the request timeout from when the request was sent.
+        /// We're currently picking one block at a time from this
+        /// peer.
+        const snubbed = 1 << 12;
+
+        /// This peer has either explicitly (with an extension)
+        /// or implicitly (by becoming a seed) told us that it
+        /// will not downloading anything more, regardless of
+        /// which pieces we have.
+        const upload_only = 1 << 13;
+
+        /// This means the last time this peer picket a piece,
+        /// it could not pick as many as it wanted because there
+        /// were not enough free ones. i.e. all pieces this peer
+        /// has were already requested from other peers.
+        const endgame_mode = 1 << 14;
+
+        /// This flag is set if the peer was in holepunch mode
+        /// when the connection succeeded. This typically only
+        /// happens if both peers are behind a NAT and the peers
+        /// connect via the NAT holepunch mechanism.
+        const holepunched = 1 << 15;
+
+        /// indicates that this socket is running on top of the
+        /// I2P transport.
+        const i2p_socket = 1 << 16;
+
+        /// indicates that this socket is a uTP socket
+        const utp_socket = 1 << 17;
+
+        /// indicates that this socket is running on top of an SSL
+        /// (TLS) channel
+        const ssl_socket = 1 << 18;
+
+        /// this connection is obfuscated with RC4
+        const rc4_encrypted = 1 << 19;
+
+        /// the handshake of this connection was obfuscated
+        /// with a Diffie-Hellman exchange
+        const plaintext_encrypted = 1 << 20;
+    }
+}
+
+bitflags! {
+    /// libtorrent/peer_info.hpp
+    ///
+    /// the flags indicating which sources a peer can
+    /// have come from. A peer may have been seen from
+    /// multiple sources
+    ///
+    /// for peer_info.source
+    pub struct PeerSourceFlags: u8 {
+        /// The peer was received from the tracker.
+        const tracker = 1 << 0;
+
+        /// The peer was received from the kademlia DHT.
+        const dht = 1 << 1;
+
+        // The peer was received from the peer exchange
+        /// extension.
+        const pex = 1 << 2;
+
+        // The peer was received from the local service
+        /// discovery (The peer is on the local network).
+        const lsd = 1 << 3;
+
+        /// The peer was added from the fast resume data.
+        const resume_data = 1 << 4;
+
+        /// we received an incoming connection from this peer
+        const incoming = 1 << 5;
+    }
+}
+
+bitflags! {
+    /// libtorrent/peer_info.hpp
+    ///
+    /// flags indicating what is blocking network transfers in up- and down
+    /// direction
+    ///
+    /// for peer_info.read_state and peer_info.write_state
+    pub struct BandwidthStateFlags: u8 {
+        /// The peer is not waiting for any external events to
+        /// send or receive data.
+        const bw_idle = 1 << 0;
+
+        /// The peer is waiting for the rate limiter.
+        const bw_limit = 1 << 1;
+
+        /// The peer has quota and is currently waiting for a
+        /// network read or write operation to complete. This is
+        /// the state all peers are in if there are no bandwidth
+        /// limits.
+        const bw_network = 1 << 2;
+
+        /// The peer is waiting for the disk I/O thread to catch
+        /// up writing buffers to disk before downloading more.
+        const bw_disk = 1 << 4;
+    }
+}
+
+bitflags! {
+    /// libtorrent/peer_info.hpp
+    ///
+    /// for peer_info.connection_type
+    pub struct ConnectionType: u8 {
+        /// Regular bittorrent connection
+        const standard_bittorrent = 1 << 0;
+
+        /// HTTP connection using the `BEP 19`_ protocol
+        const web_seed = 1 << 1;
+
+        /// HTTP connection using the `BEP 17`_ protocol
+        const http_seed = 1 << 2;
+    }
+}
