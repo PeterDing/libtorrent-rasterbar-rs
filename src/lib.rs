@@ -1,4 +1,3 @@
-use announce_entry::AnnounceEntry;
 use cxx::UniquePtr;
 
 use libtorrent_rasterbar_sys::ffi::{create_session, ParamPair, Session, TorrentHandle};
@@ -19,6 +18,7 @@ mod torrent_status;
 
 mod tests;
 
+pub use announce_entry::AnnounceEntry;
 pub use download_priority::DownloadPriority;
 pub use errors::{LTError, LTResult};
 pub use log::Log;
