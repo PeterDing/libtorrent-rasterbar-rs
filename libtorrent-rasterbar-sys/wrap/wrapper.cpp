@@ -483,6 +483,15 @@ void Session::load_all_resume_data() const {
       continue;
     }
 
+    // if save_path doesn't exist, skip
+    ec.clear();
+    if (!lt::exists(p.save_path, ec)) {
+      continue;
+    }
+    if (ec) {
+      continue;
+    }
+
     printf("load resume data: %s\n", f.c_str());
 
     lt_session->async_add_torrent(std::move(p));
