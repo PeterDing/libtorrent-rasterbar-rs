@@ -253,6 +253,17 @@ void Session::save_all_resume() const {
         continue;
       }
 
+      // if the save path doesn't exist, don't save the resume data
+      lt::error_code ec;
+      if (!lt::exists(p->params.save_path, ec)) {
+        --outstanding_resume_data;
+        continue;
+      }
+      if (ec) {
+        --outstanding_resume_data;
+        continue;
+      }
+
       auto const buf = lt::write_resume_data_buf(p->params);
       auto resume_file = get_resume_file_path(p->params.info_hashes.get_best());
 
@@ -777,6 +788,15 @@ bool Session::handle_alert(lt::alert* a) {
     auto const buf = lt::write_resume_data_buf(p->params);
     auto resume_file = get_resume_file_path(p->params.info_hashes.get_best());
 
+    // if the save path doesn't exist, don't save the resume data
+    lt::error_code ec;
+    if (!lt::exists(p->params.save_path, ec)) {
+      return false;
+    }
+    if (ec) {
+      return false;
+    }
+
     bool ok = save_file(resume_file, buf);
 
     if (!ok) {
@@ -785,7 +805,7 @@ bool Session::handle_alert(lt::alert* a) {
     }
 
     // save torrent file
-    lt::error_code ec;
+    ec.clear();
     auto torrent_file = get_torrent_file_path(p->params.info_hashes.get_best());
     if (!lt::exists(torrent_file, ec)) {
       try {
