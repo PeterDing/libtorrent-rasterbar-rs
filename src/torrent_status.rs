@@ -3,7 +3,7 @@
 use libtorrent_rasterbar_sys::ffi;
 use serde::Serialize;
 
-// the different overall states a torrent can be in
+/// the different overall states a torrent can be in
 #[repr(u8)]
 pub enum State {
     /// internal
