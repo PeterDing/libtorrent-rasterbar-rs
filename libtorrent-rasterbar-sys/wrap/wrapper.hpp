@@ -35,8 +35,9 @@ class Session {
   friend class TorrentHandle;
 
 public:
-  Session(lt::session_params params, std::string session_state_path,
-          std::string resume_dir, std::string torrent_dir, std::uint32_t log_size);
+  Session(lt::session_params params, std::uint32_t save_state_flags,
+          std::string session_state_path, std::string resume_dir, std::string torrent_dir,
+          std::uint32_t log_size);
   ~Session();
 
   void add_torrent(rust::Str torrent_path,
@@ -80,6 +81,7 @@ private:
 
   void save_all_resume() const;
 
+  std::uint32_t m_save_state_flags;
   std::string m_session_state_path;
   std::string m_resume_dir;
   std::string m_torrent_dir;

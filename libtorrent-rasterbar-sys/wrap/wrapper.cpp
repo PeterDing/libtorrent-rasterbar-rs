@@ -24,6 +24,7 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/split.hpp>
+#include <cstdint>
 #include <cstdio>
 #include <memory>
 #include <string>
@@ -183,10 +184,11 @@ TorrentInfo cast_torrent_info(const lt::torrent_info& lt_ti) {
   return ti;
 }
 
-Session::Session(lt::session_params params, std::string session_state_path,
-                 std::string resume_dir, std::string torrent_dir, std::uint32_t log_size)
-    : m_session_state_path(session_state_path), m_resume_dir(resume_dir),
-      m_torrent_dir(torrent_dir), m_log_size(log_size) {
+Session::Session(lt::session_params params, std::uint32_t save_state_flags,
+                 std::string session_state_path, std::string resume_dir,
+                 std::string torrent_dir, std::uint32_t log_size)
+    : m_save_state_flags(save_state_flags), m_session_state_path(session_state_path),
+      m_resume_dir(resume_dir), m_torrent_dir(torrent_dir), m_log_size(log_size) {
   lt_session = std::make_shared<lt::session>(lt::session(std::move(params)));
   m_running = true;
 
@@ -210,6 +212,13 @@ Session::~Session() {
   save_all_resume();
 
   printf("Session destructor 3\n");
+
+  // save session state
+  lt::save_state_flags_t flags(m_save_state_flags);
+  std::vector<char> out = lt::write_session_params_buf(lt_session->session_state(flags));
+  if (!save_file(m_session_state_path, out)) {
+    std::fprintf(stderr, "Failed to save session state\n");
+  }
 
   lt_session->abort(); // asynchronous deconstruction
   lt_session.reset();
@@ -449,7 +458,8 @@ std::unique_ptr<Session> create_session(bool min_memory_usage, bool high_perform
                            rust_str_to_string(sp.value));
   }
 
-  return std::make_unique<Session>(std::move(params), ssp, rd, td, log_size);
+  return std::make_unique<Session>(std::move(params), save_state_flags, ssp, rd, td,
+                                   log_size);
 }
 
 std::string Session::get_resume_file_path(lt::sha1_hash info_hash) const {
