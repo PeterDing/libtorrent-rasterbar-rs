@@ -529,7 +529,7 @@ impl Metrics {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Default)]
 pub struct TwoSessionStats {
     pub stats: Vec<i64>,
     pub timestamp: i64,
@@ -548,7 +548,7 @@ impl From<ffi::TwoSessionStats> for TwoSessionStats {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Default)]
 pub struct SessionStats {
     pub two_session_stats: TwoSessionStats,
 }
