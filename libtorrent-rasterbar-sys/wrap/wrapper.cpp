@@ -15,11 +15,11 @@
 #include "../libtorrent/include/libtorrent/time.hpp"
 #include "../libtorrent/include/libtorrent/torrent_flags.hpp"
 #include "../libtorrent/include/libtorrent/torrent_handle.hpp"
+#include "../libtorrent/include/libtorrent/units.hpp"
 #include "../libtorrent/include/libtorrent/write_resume_data.hpp"
 
 #include "libtorrent-rasterbar-sys/src/lib.rs.h"
 #include "states.hpp"
-#include "units.hpp"
 #include "utils.hpp"
 
 #include <boost/algorithm/string.hpp>
@@ -164,8 +164,7 @@ TorrentInfo cast_torrent_info(const lt::torrent_info& lt_ti) {
   // fill blocks per piece
   ti.blocks_per_piece = lt_ti.blocks_per_piece();
   // fill info-hash
-  // TODO: use lt_ti.info_hashs()
-  ti.info_hash = rust::String::lossy(to_hex(lt_ti.info_hash()));
+  ti.info_hash = rust::String::lossy(to_hex(lt_ti.info_hashes().get_best()));
   // file num_files
   ti.num_files = static_cast<std::uint32_t>(lt_ti.num_files());
   // fill name
