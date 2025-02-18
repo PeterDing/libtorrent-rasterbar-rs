@@ -1,0 +1,42 @@
+name: MacOS
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    name: build
+    runs-on: macos-latest
+    continue-on-error: false
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 1
+          filter: tree:0
+
+      - uses: Chocobo1/setup-ccache-action@v1
+        with:
+          update_packager_index: false
+          override_cache_key: ccache-macos-build-${{ github.base_ref }}
+          ccache_options: |
+            max_size=1G
+
+      - name: update package lists
+        continue-on-error: true
+        run: |
+          brew install boost-build boost openssl@3
+          echo "using darwin ;" >>~/user-config.jam
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: nightly
+
+      - name: build
+        run: |
+          cargo build
