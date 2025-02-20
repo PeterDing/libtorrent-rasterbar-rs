@@ -1,0 +1,41 @@
+name: Windows
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    name: build
+    runs-on: windows-latest
+    continue-on-error: false
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 1
+          filter: tree:0
+
+      - uses: Chocobo1/setup-ccache-action@v1
+        with:
+          update_packager_index: false
+          override_cache_key: ccache-linux-build-${{ github.base_ref }}
+          ccache_options: |
+            max_size=5G
+
+      - name: install boost
+        run: |
+          choco install boost-msvc-14.3 -y
+          echo "BOOST_ROOT=C:\local\boost_1_83_0" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: nightly
+
+      - name: build
+        run: |
+          cargo build
