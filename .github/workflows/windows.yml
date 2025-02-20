@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+defaults:
+  run:
+    shell: cmd
+
 jobs:
   build:
     name: build
@@ -18,13 +22,6 @@ jobs:
           submodules: true
           fetch-depth: 1
           filter: tree:0
-
-      - uses: Chocobo1/setup-ccache-action@v1
-        with:
-          update_packager_index: false
-          override_cache_key: ccache-windows-build-${{ github.base_ref }}
-          ccache_options: |
-            max_size=5G
 
       - name: install boost
         run: |
