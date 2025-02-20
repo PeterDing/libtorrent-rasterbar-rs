@@ -22,7 +22,7 @@ jobs:
       - uses: Chocobo1/setup-ccache-action@v1
         with:
           update_packager_index: false
-          override_cache_key: ccache-linux-build-${{ github.base_ref }}
+          override_cache_key: ccache-windows-build-${{ github.base_ref }}
           ccache_options: |
             max_size=5G
 
