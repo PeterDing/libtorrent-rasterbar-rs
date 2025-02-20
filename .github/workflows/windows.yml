@@ -28,8 +28,14 @@ jobs:
 
       - name: install boost
         run: |
-          choco install boost-msvc-14.3 -y
-          echo "BOOST_ROOT=C:\local\boost_1_83_0" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          git clone --depth=1 --recurse-submodules -j10 --branch=boost-1.78.0 https://github.com/boostorg/boost.git
+          cd boost
+          bootstrap.bat
+
+      - name: boost headers
+        run: |
+          cd boost
+          .\b2 headers
 
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -38,4 +44,6 @@ jobs:
 
       - name: build
         run: |
+          set BOOST_ROOT=%CD%\boost
+          set PATH=%BOOST_ROOT%;%PATH%
           cargo build
