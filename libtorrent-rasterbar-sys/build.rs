@@ -33,66 +33,44 @@ fn main() {
         }
     }
 
-    // let mut b = cxx_build::bridge("src/lib.rs");
-    // b.cpp(true)
-    //     .flag("-ftemplate-depth-512")
-    //     .flag("-std=c++14")
-    //     .flag("-fvisibility-inlines-hidden")
-    //     .flag("-pthread")
-    //     .opt_level(3)
-    //     .flag("-finline-functions")
-    //     .flag("-Wno-inline")
-    //     .flag("-fvisibility=hidden")
-    //     .flag("-Wno-noexcept-type")
-    //     .warnings(false)
-    //     .extra_warnings(false)
-    //     .flag("-Wno-format-zero-length")
-    //     .flag("-Wpedantic")
-    //     .flag("-Wvla")
-    //     .define("BOOST_ALL_NO_LIB", None)
-    //     .define("BOOST_ASIO_ENABLE_CANCELIO", None)
-    //     .define("BOOST_ASIO_HAS_STD_CHRONO", None)
-    //     .define("BOOST_ASIO_NO_DEPRECATED", None)
-    //     .define("BOOST_MULTI_INDEX_DISABLE_SERIALIZATION", None)
-    //     .define("BOOST_NO_DEPRECATED", None)
-    //     .define("BOOST_SYSTEM_NO_DEPRECATED", None)
-    //     .define("NDEBUG", None)
-    //     .define("OPENSSL_NO_SSL2", None)
-    //     .define("TORRENT_BUILDING_LIBRARY", None)
-    //     .define("TORRENT_SSL_PEERS", None)
-    //     .define("TORRENT_USE_I2P", "1")
-    //     .define("TORRENT_USE_LIBCRYPTO", None)
-    //     .define("TORRENT_USE_OPENSSL", None)
-    //     .define("TORRENT_USE_UNC_PATHS", None)
-    //     .define("_FILE_OFFSET_BITS", "64")
-    //     .include("/usr/include/boost")
-    //     .include("libtorrent/include")
-    //     .include("libtorrent/include/libtorrent")
-    //     .include("libtorrent/deps/try_signal");
-
     let mut build = cxx_build::bridge("src/lib.rs");
 
+    // Get compiler name
+    let compiler = build.compiler_name();
+
     // Set C++ standard
-    build.cpp(true).flag_if_supported("-std=c++14");
+    if compiler.contains("cl.exe") {
+        build.flag("/std:c++14");
+    } else {
+        build.flag("-std=c++14");
+    }
 
     // Optimization and visibility flags
-    build
-        .flag_if_supported("-O3")
-        .flag_if_supported("-finline-functions")
-        .flag_if_supported("-fvisibility=hidden")
-        .flag_if_supported("-fvisibility-inlines-hidden");
+    if compiler.contains("cl.exe") {
+        build.flag("/O2");
+        build.flag("/Ob");
+    } else {
+        build.flag_if_supported("-O3");
+        build.flag_if_supported("-finline-functions");
+        build.flag_if_supported("-fvisibility=hidden");
+        build.flag_if_supported("-fvisibility-inlines-hidden");
+    }
 
     // Warning flags
-    build
-        .warnings(false)
-        .extra_warnings(false)
-        .flag_if_supported("-Wno-inline")
-        .flag_if_supported("-Wno-nonnull")
-        .flag_if_supported("-Wno-noexcept-type")
-        .flag_if_supported("-Wno-format-zero-length");
+    if compiler.contains("cl.exe") {
+        build.flag("/W3");
+    } else {
+        build.warnings(false).extra_warnings(false);
+        build.flag_if_supported("-Wno-inline");
+        build.flag_if_supported("-Wno-nonnull");
+        build.flag_if_supported("-Wno-noexcept-type");
+        build.flag_if_supported("-Wno-format-zero-length");
+    }
 
     // Template depth
-    build.flag_if_supported("-ftemplate-depth-512");
+    if !compiler.contains("cl.exe") {
+        build.flag_if_supported("-ftemplate-depth-512");
+    }
 
     // Definitions
     build
@@ -114,16 +92,23 @@ fn main() {
         .define("_FILE_OFFSET_BITS", "64");
 
     // Include directories
-    build
-        .include("/opt/homebrew/include")
-        .include("/usr/local/opt/boost/include")
-        .include("/usr/include/boost")
-        .include("libtorrent/include")
-        .include("libtorrent/include/libtorrent")
-        .include("libtorrent/deps/try_signal");
+    if cfg!(target_family = "windows") {
+        let boost_root = std::env::var("BOOST_ROOT").expect("BOOST_ROOT environment variable must be set");
+        build.include(format!("{}/include", boost_root));
+    } else if cfg!(target_vendor = "apple") {
+        build.include("/opt/homebrew/include");
+        build.include("/usr/local/opt/boost/include");
+    } else {
+        build.include("/usr/include/boost");
+    }
+    build.include("libtorrent/include");
+    build.include("libtorrent/include/libtorrent");
+    build.include("libtorrent/deps/try_signal");
 
     // Enable threading
-    build.flag("-pthread");
+    if !cfg!(target_family = "windows") {
+        build.flag("-pthread");
+    }
 
     // Add wrapper files
     for cpp in glob("wrap/*.cpp").unwrap().flatten() {
@@ -146,7 +131,8 @@ fn main() {
     for cpp in glob("wrap/*.cpp").unwrap().flatten() {
         println!("cargo:rerun-if-changed={}", cpp.display());
     }
-    for cpp in glob("wrap/*.hpp").unwrap().flatten() {
-        println!("cargo:rerun-if-changed={}", cpp.display());
+    for hpp in glob("wrap/*.hpp").unwrap().flatten() {
+        println!("cargo:rerun-if-changed={}", hpp.display());
     }
 }
+
