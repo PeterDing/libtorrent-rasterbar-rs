@@ -35,18 +35,15 @@ fn main() {
 
     let mut build = cxx_build::bridge("src/lib.rs");
 
-    // Get compiler name
-    let compiler = build.compiler_name();
-
     // Set C++ standard
-    if compiler.contains("cl.exe") {
+    if cfg!(target_family = "windows") {
         build.flag("/std:c++14");
     } else {
         build.flag("-std=c++14");
     }
 
     // Optimization and visibility flags
-    if compiler.contains("cl.exe") {
+    if cfg!(target_family = "windows") {
         build.flag("/O2");
         build.flag("/Ob");
     } else {
@@ -57,7 +54,7 @@ fn main() {
     }
 
     // Warning flags
-    if compiler.contains("cl.exe") {
+    if cfg!(target_family = "windows") {
         build.flag("/W3");
     } else {
         build.warnings(false).extra_warnings(false);
@@ -68,7 +65,7 @@ fn main() {
     }
 
     // Template depth
-    if !compiler.contains("cl.exe") {
+    if cfg!(target_family = "windows") {
         build.flag_if_supported("-ftemplate-depth-512");
     }
 
