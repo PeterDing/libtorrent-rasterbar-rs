@@ -31,6 +31,7 @@ bool save_file(std::string const& filename, std::vector<char> const& v) {
   std::fstream f(filename,
                  std::ios_base::trunc | std::ios_base::out | std::ios_base::binary);
   f.write(v.data(), int(v.size()));
+  f.flush();
   return !f.fail();
 }
 
