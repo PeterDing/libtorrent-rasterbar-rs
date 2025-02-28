@@ -206,6 +206,7 @@ Session::~Session() {
     m_thread->join();
   }
 
+  lt_session->pause();
   printf("Session destructor 2\n");
 
   save_all_resume();
@@ -231,7 +232,7 @@ void Session::save_all_resume() const {
   std::vector<lt::torrent_handle> handles = lt_session->get_torrents();
   for (lt::torrent_handle const& h : handles)
     try {
-      h.save_resume_data(lt::torrent_handle::only_if_modified);
+      h.save_resume_data(lt::torrent_handle::save_info_dict);
       ++outstanding_resume_data;
     } catch (lt::system_error const& e) {
       // the handle was invalid, ignore this one and move to the next
@@ -265,10 +266,14 @@ void Session::save_all_resume() const {
       lt::error_code ec;
       if (!lt::exists(p->params.save_path, ec)) {
         --outstanding_resume_data;
+        std::fprintf(stderr, "resume data path doesn't exist: %s\n",
+                     p->params.save_path.c_str());
         continue;
       }
       if (ec) {
         --outstanding_resume_data;
+        std::fprintf(stderr, "lt::exists failed: %s | %s\n", ec.message().c_str(),
+                     p->params.save_path.c_str());
         continue;
       }
 
