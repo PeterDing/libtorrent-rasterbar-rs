@@ -914,6 +914,52 @@ pub mod ffi {
         fn force_reannounce(self: &TorrentHandle);
         fn clear_error(self: &TorrentHandle);
 
+        /// ``set_upload_limit`` will limit the upload bandwidth used by this
+        /// particular torrent to the limit you set. It is given as the number of
+        /// bytes per second the torrent is allowed to upload.
+        /// ``set_download_limit`` works the same way but for download bandwidth
+        /// instead of upload bandwidth. Note that setting a higher limit on a
+        /// torrent then the global limit
+        /// (``settings_pack::upload_rate_limit``) will not override the global
+        /// rate limit. The torrent can never upload more than the global rate
+        /// limit.
+        ///
+        /// ``upload_limit`` and ``download_limit`` will return the current limit
+        /// setting, for upload and download, respectively.
+        ///
+        /// Local peers are not rate limited by default. see peer-classes_.
+        fn set_upload_limit(self: &TorrentHandle, limit: i32);
+        fn upload_limit(self: &TorrentHandle) -> i32;
+        fn set_download_limit(self: &TorrentHandle, limit: i32);
+        fn download_limit(self: &TorrentHandle) -> i32;
+
+        /// This will disconnect all peers and clear the peer list for this
+        /// torrent. New peers will have to be acquired before resuming, from
+        /// trackers, DHT or local service discovery, for example.
+        fn clear_peers(self: &TorrentHandle);
+
+        /// ``set_max_uploads()`` sets the maximum number of peers that's unchoked
+        /// at the same time on this torrent. If you set this to -1, there will be
+        /// no limit. This defaults to infinite. The primary setting controlling
+        /// this is the global unchoke slots limit, set by unchoke_slots_limit in
+        /// settings_pack.
+        ///
+        /// ``max_uploads()`` returns the current settings.
+        fn set_max_uploads(self: &TorrentHandle, max_uploads: i32);
+        fn max_uploads(self: &TorrentHandle) -> i32;
+
+        /// ``set_max_connections()`` sets the maximum number of connection this
+        /// torrent will open. If all connections are used up, incoming
+        /// connections may be refused or poor connections may be closed. This
+        /// must be at least 2. The default is unlimited number of connections. If
+        /// -1 is given to the function, it means unlimited. There is also a
+        /// global limit of the number of connections, set by
+        /// ``connections_limit`` in settings_pack.
+        ///
+        /// ``max_connections()`` returns the current settings.
+        fn set_max_connections(self: &TorrentHandle, max_connections: i32);
+        fn max_connections(self: &TorrentHandle) -> i32;
+
         /// ``pause()``, and ``resume()`` will disconnect all peers and reconnect
         /// all peers respectively. When a torrent is paused, it will however
         /// remember all share ratios to all peers and remember all potential (not
