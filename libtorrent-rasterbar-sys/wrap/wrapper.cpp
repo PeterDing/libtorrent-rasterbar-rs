@@ -709,6 +709,10 @@ rust::Vec<TorrentInfo> Session::get_torrents() const {
   std::vector<lt::torrent_handle> handles = ses->get_torrents();
   rust::Vec<TorrentInfo> ret;
   for (auto& h : handles) {
+    if (!h.is_valid()) {
+      continue;
+    }
+
     std::shared_ptr<const lt::torrent_info> tf = h.torrent_file();
     ret.push_back(cast_torrent_info(*tf));
   }
