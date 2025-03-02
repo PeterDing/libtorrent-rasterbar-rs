@@ -909,9 +909,53 @@ pub mod ffi {
 
         fn add_tracker(self: &TorrentHandle, tracker_url: &str, tier: u8);
 
+        /// ``scrape_tracker()`` will send a scrape request to a tracker. By
+        /// default (``idx`` = -1) it will scrape the last working tracker. If
+        /// ``idx`` is >= 0, the tracker with the specified index will scraped.
+        ///
+        /// A scrape request queries the tracker for statistics such as total
+        /// number of incomplete peers, complete peers, number of downloads etc.
+        ///
+        /// This request will specifically update the ``num_complete`` and
+        /// ``num_incomplete`` fields in the torrent_status struct once it
+        /// completes. When it completes, it will generate a scrape_reply_alert.
+        /// If it fails, it will generate a scrape_failed_alert.
         fn scrape_tracker(self: &TorrentHandle);
+
+        /// ``force_recheck`` puts the torrent back in a state where it assumes to
+        /// have no resume data. All peers will be disconnected and the torrent
+        /// will stop announcing to the tracker. The torrent will be added to the
+        /// checking queue, and will be checked (all the files will be read and
+        /// compared to the piece hashes). Once the check is complete, the torrent
+        /// will start connecting to peers again, as normal.
+        /// The torrent will be placed last in queue, i.e. its queue position
+        /// will be the highest of all torrents in the session.
         fn force_recheck(self: &TorrentHandle);
+
+        /// ``force_reannounce()`` will force this torrent to do another tracker
+        /// request, to receive new peers. The ``seconds`` argument specifies how
+        /// many seconds from now to issue the tracker announces.
+        ///
+        /// If the tracker's ``min_interval`` has not passed since the last
+        /// announce, the forced announce will be scheduled to happen immediately
+        /// as the ``min_interval`` expires. This is to honor trackers minimum
+        /// re-announce interval settings.
+        ///
+        /// The ``tracker_index`` argument specifies which tracker to re-announce.
+        /// If set to -1 (which is the default), all trackers are re-announce.
+        ///
+        /// The ``flags`` argument can be used to affect the re-announce. See
+        /// ignore_min_interval.
+        ///
+        /// ``force_dht_announce`` will announce the torrent to the DHT
+        /// immediately.
+        ///
+        /// ``force_lsd_announce`` will announce the torrent on LSD
+        /// immediately.
         fn force_reannounce(self: &TorrentHandle);
+        fn force_dht_announce(self: &TorrentHandle);
+        fn force_lsd_announce(self: &TorrentHandle);
+
         fn clear_error(self: &TorrentHandle);
 
         /// ``set_upload_limit`` will limit the upload bandwidth used by this

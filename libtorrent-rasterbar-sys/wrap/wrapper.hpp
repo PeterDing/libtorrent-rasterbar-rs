@@ -149,7 +149,27 @@ public:
 
   void add_tracker(rust::Str tracker_url, std::uint8_t tier) const;
 
+  // ``scrape_tracker()`` will send a scrape request to a tracker. By
+  // default (``idx`` = -1) it will scrape the last working tracker. If
+  // ``idx`` is >= 0, the tracker with the specified index will scraped.
+  //
+  // A scrape request queries the tracker for statistics such as total
+  // number of incomplete peers, complete peers, number of downloads etc.
+  //
+  // This request will specifically update the ``num_complete`` and
+  // ``num_incomplete`` fields in the torrent_status struct once it
+  // completes. When it completes, it will generate a scrape_reply_alert.
+  // If it fails, it will generate a scrape_failed_alert.
   void scrape_tracker() const;
+
+  // ``force_recheck`` puts the torrent back in a state where it assumes to
+  // have no resume data. All peers will be disconnected and the torrent
+  // will stop announcing to the tracker. The torrent will be added to the
+  // checking queue, and will be checked (all the files will be read and
+  // compared to the piece hashes). Once the check is complete, the torrent
+  // will start connecting to peers again, as normal.
+  // The torrent will be placed last in queue, i.e. its queue position
+  // will be the highest of all torrents in the session.
   void force_recheck() const;
 
   // ``force_reannounce()`` will force this torrent to do another tracker
