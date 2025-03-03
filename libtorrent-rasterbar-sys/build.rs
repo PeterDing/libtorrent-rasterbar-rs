@@ -13,7 +13,15 @@ fn pull_submodules() {
 fn main() {
     println!("cargo:rustc-link-lib=crypto");
     println!("cargo:rustc-link-lib=ssl");
-    println!("cargo:rustc-link-lib=boost_filesystem");
+
+    if cfg!(target_family = "windows") {
+        // Link against Boost libraries on Windows
+        let boost_root = std::env::var("BOOST_ROOT").expect("BOOST_ROOT environment variable must be set");
+        println!("cargo:rustc-link-search={}\\stage\\lib", boost_root);
+        println!("cargo:rustc-link-lib=boost_filesystem-vc143-mt-x64-1_78");
+    } else {
+        println!("cargo:rustc-link-lib=boost_filesystem");
+    }
 
     pull_submodules();
 
@@ -33,11 +41,21 @@ fn main() {
         }
     }
 
-    let mut build = cxx_build::bridge("src/lib.rs");
+    let mut build = if cfg!(target_family = "windows") {
+        cxx_build::bridge(r"src\lib.rs")
+    } else {
+        cxx_build::bridge("src/lib.rs")
+    };
 
     // Set C++ standard
     if cfg!(target_family = "windows") {
         build.flag("/std:c++14");
+        build.flag("/EHsc"); // Enable C++ exceptions
+        build.flag("/MD"); // Use multithreaded DLL runtime
+        //
+        let boost_root = std::env::var("BOOST_ROOT").expect("BOOST_ROOT environment variable must be set");
+        build.include(format!("{}\\include", boost_root));
+        build.include(format!("{}\\include\\boost-1_78", boost_root));
     } else {
         build.flag("-std=c++14");
     }
@@ -132,4 +150,3 @@ fn main() {
         println!("cargo:rerun-if-changed={}", hpp.display());
     }
 }
-
