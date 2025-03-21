@@ -22,6 +22,7 @@
 #include "states.hpp"
 #include "utils.hpp"
 
+#include <algorithm>
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <cstdint>
@@ -481,6 +482,7 @@ std::string Session::get_torrent_file_path(lt::sha1_hash info_hash) const {
 }
 
 void Session::load_all_resume_data() const {
+  std::vector<lt::add_torrent_params> resume_data_list;
   std::vector<std::string> files = list_dir(m_resume_dir);
   for (auto& f : files) {
     if (!(f.size() > 7 && f.substr(f.size() - 7) == ".resume"))
@@ -508,6 +510,16 @@ void Session::load_all_resume_data() const {
 
     printf("load resume data: %s\n", f.c_str());
 
+    resume_data_list.emplace_back(std::move(p));
+  }
+
+  // sort the resume_data_list by added_time
+  std::sort(resume_data_list.begin(), resume_data_list.end(),
+            [](lt::add_torrent_params const& a, lt::add_torrent_params const& b) {
+              return a.added_time < b.added_time;
+            });
+
+  for (auto& p : resume_data_list) {
     lt_session->async_add_torrent(std::move(p));
   }
 }
